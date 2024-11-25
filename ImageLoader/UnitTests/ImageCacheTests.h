@@ -1,9 +1,10 @@
 #pragma once
 
+
 namespace UnitTests
 {
-
-	class AcceptanceTests
+	class ImageCacheTests
 	{
+
 	};
 }

@@ -44,49 +44,9 @@ struct IImageLoader
 /// </summary>
 class ImageLoader : public IImageLoader
 {
-	struct WaitCondition
-	{
-		std::mutex Mutex;
-		std::condition_variable Condition;
-
-		void Wait()
-		{
-			std::unique_lock<std::mutex> lock(Mutex);
-			Condition.wait(lock);
-		}
-
-		void Signal()
-		{
-			Condition.notify_one();
-		}
-	};
 
 	ImageCaching::IImageCache* _imageCache;
 	int _maxThreadCount;
-
-	std::mutex _activeThreadCountMutex;
-	int _activeThreadCount = 0;
-
-
-	std::mutex _taskWaitConditionsMutex;
-	std::vector<WaitCondition*> _taskWaitConditions;
-
-private:
-	int IncrementActiveThreadCount()
-	{
-		std::lock_guard<std::mutex> lockGuard(_activeThreadCountMutex);
-		_activeThreadCount++;
-	}
-	int DecrementActiveThreadCount()
-	{
-		std::lock_guard<std::mutex> lockGuard(_activeThreadCountMutex);
-		_activeThreadCount--;
-	}
-	int GetActiveThreadCount()
-	{
-		std::lock_guard<std::mutex> lockGuard(_activeThreadCountMutex);
-		return _activeThreadCount;
-	}
 
 public:
 	ImageLoader(ImageCaching::IImageCache* imageCache, int maxThreadCount);

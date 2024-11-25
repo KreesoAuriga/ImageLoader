@@ -20,13 +20,6 @@ void ImageLoader::SetMaxThreadCount(int count)
     _maxThreadCount = count;
 }
 
-struct ThreadContainer
-{
-    std::promise<const ImageData*> promise;
-
-};
-
-
 std::future<const IImage*> ImageLoader::TryGetImage(const std::filesystem::path& filePath)
 {    
     std::promise<const IImage*> imagePromise;
@@ -77,10 +70,11 @@ std::future<const IImage*> ImageLoader::TryGetImage(const std::filesystem::path&
 
 bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height, const IImage*& outImage)
 {
-    return false;
+    throw std::runtime_error("Not implemented");
 }
 
 
 void ImageLoader::ReleaseImage(const std::filesystem::path& filePath)
 {
+    throw std::runtime_error("Not implemented");
 }
