@@ -1,5 +1,11 @@
+#include "Image.h"
 #include "ImageLoader.h"
+#include "ImageFileLoader.h"
 #include <cassert>
+#include <future>
+#include <thread>
+#include <iostream>
+
 
 ImageLoader::ImageLoader(ImageCache::IImageCache* imageCache)
 	: _imageCache(imageCache)
@@ -12,7 +18,7 @@ void ImageLoader::SetMaxThreadCount(int count)
 {
 }
 
-bool ImageLoader::TryGetImage(std::string& filePath, IImage*& outImage)
+bool ImageLoader::TryGetImage(const std::string& filePath, const IImage*& outImage)
 {
 
 	std::lock_guard<std::mutex> lockGuard(_cacheLock);
@@ -21,11 +27,49 @@ bool ImageLoader::TryGetImage(std::string& filePath, IImage*& outImage)
 		return true;
 
 
+	std::promise<ImageFileData*> promise;
+	std::future<ImageFileData*> future = promise.get_future();
 
-	return false;
+    std::thread t([&promise, filePath]
+    {
+        try
+        {
+            auto imageFileLoader = new ImageFileLoader();
+            const auto fileData = imageFileLoader->LoadFile(filePath);
+
+            // code that may throw
+            //throw std::runtime_error("Example");
+        }
+        catch (...)
+        {
+            try
+            {
+                // store anything thrown in the promise
+                promise.set_exception(std::current_exception());
+            }
+            catch (...) {} // set_exception() may throw too
+        }
+    });
+
+    const ImageFileData* imageFileData = nullptr;
+    try
+    {
+        imageFileData = future.get();
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << "Exception from the thread: " << e.what() << '\n';
+        return false;
+    }
+
+    t.join();
+
+    outImage = new Image(filePath, imageFileData->Width, imageFileData->Height, imageFileData->Data);
+
+	return true;
 }
 
-bool ImageLoader::TryGetImage(std::string filePath, unsigned int width, unsigned int height, IImage*& outImage)
+bool ImageLoader::TryGetImage(const std::string& filePath, int width, int height, const IImage*& outImage)
 {
 	return false;
 }

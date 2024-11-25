@@ -18,11 +18,11 @@ namespace ImageCache
 		/// <param name="imagePath"></param>
 		/// <param name="outImage"></param>
 		/// <returns></returns>
-		virtual bool TryGetImage(std::string imagePath, IImage* outImage) = 0;
+		virtual bool TryGetImage(std::string imagePath, const IImage* outImage) = 0;
 
-		virtual bool TryGetImageAtSize(std::string imagePath, unsigned int width, unsigned int height, IImage*& outImage) = 0;
+		virtual bool TryGetImageAtSize(std::string imagePath, unsigned int width, unsigned int height, const IImage*& outImage) = 0;
 
-		virtual bool TryAddImage(std::string imagePath, IImage* outImage) = 0;
+		virtual bool TryAddImage(std::string imagePath, const IImage* outImage) = 0;
 	};
 
 

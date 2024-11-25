@@ -47,8 +47,8 @@ public:
 
 	virtual void SetMaxThreadCount(int count) override;
 
-	virtual bool TryGetImage(const std::string& filePath, IImage*& outImage) override;
+	virtual bool TryGetImage(const std::string& filePath, const IImage*& outImage) override;
 
-	virtual bool TryGetImage(const std::string& filePath, unsigned int width, unsigned int height, IImage*& outImage) override;
+	virtual bool TryGetImage(const std::string& filePath, unsigned int width, unsigned int height, const IImage*& outImage) override;
 
 };

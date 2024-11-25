@@ -14,13 +14,13 @@ public:
 	/// Gets the width in pixels of this image.
 	/// </summary>
 	[[nodiscard]]
-	virtual unsigned int GetWidth() const = 0;
+	virtual int GetWidth() const = 0;
 
 	/// <summary>
 	/// Gets the height in pixels of this image.
 	/// </summary>
 	[[nodiscard]]
-	virtual unsigned int GetHeight() const = 0;
+	virtual int GetHeight() const = 0;
 
 	/// <summary>
 	/// Gets the <see cref="ImageFormat"/> of this image as stored in memory.
@@ -33,7 +33,7 @@ public:
 	/// </summary>
 	/// <param name="imageFormat">The format to return the image in.</param>
 	[[nodiscard]]
-	virtual char* GetPixels(ImageFormat imageFormat) const = 0;
+	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const = 0;
 
 	/// <summary>
 	/// Gets the path from which image was originally loaded.
@@ -54,20 +54,62 @@ struct IImageResized : public IImage
 class Image : public IImage
 {
 protected:
-	unsigned int _width;
-	unsigned int _height;
-	char* _imageData;
+	int _width;
+	int _height;
+	const unsigned char* _imageData;
 
 	std::string _sourcePath;
 
 public:
-	Image(const std::string& sourcePath, unsigned int width, unsigned int height, char* imageData)
+	Image(const std::string& sourcePath, int width, int height, const unsigned char* imageData)
 		: _sourcePath(std::move(sourcePath))
 		, _width(width)
 		, _height(height)
 		, _imageData(imageData)
 	{
 	}
+
+	/// <summary>
+	/// Gets the width in pixels of this image.
+	/// </summary>
+	[[nodiscard]]
+	virtual int GetWidth() const {
+		return _width;
+	}
+
+	/// <summary>
+	/// Gets the height in pixels of this image.
+	/// </summary>
+	[[nodiscard]]
+	virtual int GetHeight() const {
+		return _height;
+	}
+
+	/// <summary>
+	/// Gets the <see cref="ImageFormat"/> of this image as stored in memory.
+	/// </summary>
+	[[nodiscard]]
+	virtual ImageFormat GetNativeImageFormat() const {
+		return ImageFormat::RGB8;
+	}
+
+	/// <summary>
+	/// Gets the image data pixels, as raw image data
+	/// </summary>
+	/// <param name="imageFormat">The format to return the image in.</param>
+	[[nodiscard]]
+	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const {
+		return _imageData;
+	}
+
+	/// <summary>
+	/// Gets the path from which image was originally loaded.
+	/// </summary>
+	[[nodiscard]]
+	virtual std::string GetImagePath() const {
+		return _sourcePath;
+	}
+
 };
 
 class ImageResized : public Image
