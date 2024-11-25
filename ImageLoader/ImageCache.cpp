@@ -105,7 +105,7 @@ TryGetImageResult ImageCache::TryGetImageAtSize(
 	return TryGetImageResult::NotFound;
 }
 
-AddOrUpdateImageResult ImageCache::AddOrUpdateImage(const IImage* image)
+TryAddImageResult ImageCache::TryAddImage(const IImage* image)
 {
 	
 	std::lock_guard<std::mutex> lockGuard(_cacheLock);
@@ -122,15 +122,14 @@ AddOrUpdateImageResult ImageCache::AddOrUpdateImage(const IImage* image)
 
 		const auto* sourceImage = sourceImageItem.Image;
 
-		if (image == sourceImage)
-			return AddOrUpdateImageResult::NoChange;
+		if (image == sourceImage) //is the exact same instance.
+			return TryAddImageResult::NoChange;
 
 		if (image->GetWidth() == sourceImage->GetWidth() &&
 			image->GetHeight() == sourceImage->GetHeight())
 		{
-			//cached item and provided item are not the same, but are the same size. Replace the cached item.
-			cacheEntry->SourceImageItem = image;
-			return AddOrUpdateImageResult::Updated;
+			//not a different size than source.
+			return TryAddImageResult::NoChange;
 		}
 
 		const auto resizedImageKey = ResizedImageKey(image->GetWidth(), image->GetHeight()).ToString();
@@ -143,11 +142,12 @@ AddOrUpdateImageResult ImageCache::AddOrUpdateImage(const IImage* image)
 			{
 				auto* resizedImageItem = resizedSearch->second;
 				resizedImageItem->UpdateLastAccessedTime();
-				if( resizedImageItem->Image == image)
-					return AddOrUpdateImageResult::NoChange;
+				if( resizedImageItem->Image == image )
+					return TryAddImageResult::NoChange;
 
-				resizedImageItem->Image = image;
-				return AddOrUpdateImageResult::UpdatedAsResizedImage;
+				if (resizedImageItem->Image->GetWidth() == image->GetWidth() && 
+					resizedImageItem->Image->GetHeight() == image->GetHeight())
+					return TryAddImageResult::NoChange;
 			}
 		}
 
@@ -163,14 +163,14 @@ AddOrUpdateImageResult ImageCache::AddOrUpdateImage(const IImage* image)
 		(*cacheEntry->ResizedImages)[resizedImageKey] = new ImageCacheItem(image);
 		_currentMemoryUsage += image->GetSizeInBytes();
 		CheckMemoryUsage();
-		return AddOrUpdateImageResult::AddedAsResizedImage;
+		return TryAddImageResult::AddedAsResizedImage;
 	}
 
 	_images[key] = new ImageCacheEntry(image);
 	_currentMemoryUsage += image->GetSizeInBytes();
 
 	CheckMemoryUsage();
-	return AddOrUpdateImageResult::Added;
+	return TryAddImageResult::Added;
 }
 
 bool ImageCaching::ImageCache::TryRemoveImage(const IImage* image)

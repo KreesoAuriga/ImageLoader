@@ -7,8 +7,9 @@
 #include <iostream>
 
 
-ImageLoader::ImageLoader(ImageCaching::IImageCache* imageCache)
+ImageLoader::ImageLoader(ImageCaching::IImageCache* imageCache, int maxThreadCount)
 	: _imageCache(imageCache)
+    , _maxThreadCount(maxThreadCount)
 
 {
 	assert((imageCache, "ImageCache cannot be null"));
@@ -16,60 +17,62 @@ ImageLoader::ImageLoader(ImageCaching::IImageCache* imageCache)
 
 void ImageLoader::SetMaxThreadCount(int count)
 {
+    _maxThreadCount = count;
 }
 
-bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImage*& outImage)
+struct ThreadContainer
 {
+    std::promise<const ImageData*> promise;
 
-	//std::lock_guard<std::mutex> lockGuard(_cacheLock);
-
-	if (_imageCache->TryGetImage(filePath, outImage) != ImageCaching::TryGetImageResult::NotFound )
-		return true;
+};
 
 
-	std::promise<const ImageData*> promise;
-	std::future<const ImageData*> future = promise.get_future();
-
-    std::thread t([&promise, filePath]
+std::future<const IImage*> ImageLoader::TryGetImage(const std::filesystem::path& filePath)
+{    
+    std::promise<const IImage*> imagePromise;
+    std::future<const IImage*> imageFuture = imagePromise.get_future();
+    
+    const IImage* cachedImage = nullptr;
+    if (_imageCache->TryGetImage(filePath, cachedImage) != ImageCaching::TryGetImageResult::NotFound)
     {
+        imagePromise.set_value(cachedImage);
+        return imageFuture;
+    }
+
+    auto* imageCache = _imageCache;
+    std::thread t([imagePromise = std::move(imagePromise), filePath, imageCache]() mutable
+    {
+      
         try
         {
             auto imageFileLoader = new ImageDataReader();
             const auto fileData = imageFileLoader->ReadFile(filePath);
-            promise.set_value(fileData);
 
-            // code that may throw
-            //throw std::runtime_error("Example");
+            const auto* image = new Image(filePath, fileData->Width, fileData->Height, fileData->Data);
+            const auto tryAddResult = imageCache->TryAddImage(image);
+            if (tryAddResult == ImageCaching::TryAddImageResult::NoChange)
+            {
+                //image is already in the cache, probably from another thread doing the same work.
+                imageCache->TryGetImage(filePath, image);
+            }
+
+            imagePromise.set_value(image);
         }
         catch (...)
         {
             try
             {
                 // store anything thrown in the promise
-                promise.set_exception(std::current_exception());
+                imagePromise.set_exception(std::current_exception());
             }
             catch (...) {} // set_exception() may throw too
         }
+
     });
 
-    const ImageData* imageFileData = nullptr;
-    try
-    {
-        imageFileData = future.get();
-        imageFileData = imageFileData;
-    }
-    catch (const std::exception& e)
-    {
-        std::cout << "Exception from the thread: " << e.what() << '\n';
-        return false;
-    }
+    t.detach();
 
-    t.join();
-
-    outImage = new Image(filePath, imageFileData->Width, imageFileData->Height, imageFileData->Data);
-    _imageCache->AddOrUpdateImage(outImage);
-
-	return true;
+    return imageFuture;
 }
 
 bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height, const IImage*& outImage)

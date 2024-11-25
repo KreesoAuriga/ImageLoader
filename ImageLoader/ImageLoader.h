@@ -3,6 +3,7 @@
 #include "Image.h"
 #include "ImageCache.h"
 #include <mutex>
+#include <future>
 
 //Interface for loading images from a path, optionally resized to custom dimensions.
 struct IImageLoader
@@ -19,7 +20,7 @@ struct IImageLoader
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual bool TryGetImage(const std::filesystem::path& filePath, const IImage*& outImage) = 0;
+	virtual std::future<const IImage*> TryGetImage(const std::filesystem::path& filePath) = 0;
 
 	/// <summary>
 	/// Attempts to get the image at the specified path, and at the specified size. Returns false if the image could not be obtained.
@@ -43,13 +44,52 @@ struct IImageLoader
 /// </summary>
 class ImageLoader : public IImageLoader
 {
+	struct WaitCondition
+	{
+		std::mutex Mutex;
+		std::condition_variable Condition;
+
+		void Wait()
+		{
+			std::unique_lock<std::mutex> lock(Mutex);
+			Condition.wait(lock);
+		}
+
+		void Signal()
+		{
+			Condition.notify_one();
+		}
+	};
+
 	ImageCaching::IImageCache* _imageCache;
-	std::mutex _cacheLock;
+	int _maxThreadCount;
+
+	std::mutex _activeThreadCountMutex;
+	int _activeThreadCount = 0;
+
+
+	std::mutex _taskWaitConditionsMutex;
+	std::vector<WaitCondition*> _taskWaitConditions;
 
 private:
+	int IncrementActiveThreadCount()
+	{
+		std::lock_guard<std::mutex> lockGuard(_activeThreadCountMutex);
+		_activeThreadCount++;
+	}
+	int DecrementActiveThreadCount()
+	{
+		std::lock_guard<std::mutex> lockGuard(_activeThreadCountMutex);
+		_activeThreadCount--;
+	}
+	int GetActiveThreadCount()
+	{
+		std::lock_guard<std::mutex> lockGuard(_activeThreadCountMutex);
+		return _activeThreadCount;
+	}
 
 public:
-	ImageLoader(ImageCaching::IImageCache* imageCache);
+	ImageLoader(ImageCaching::IImageCache* imageCache, int maxThreadCount);
 
 	/// <summary>
 	/// Sets the maximum number of threads the loader is allowed to use for loading images. A value of 0 specifies that 
@@ -63,7 +103,7 @@ public:
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual bool TryGetImage(const std::filesystem::path& filePath, const IImage*& outImage) override;
+	virtual std::future<const IImage*> TryGetImage(const std::filesystem::path& filePath) override;
 
 	/// <summary>
 	/// Attempts to get the image at the specified path, and at the specified size. Returns false if the image could not be obtained.

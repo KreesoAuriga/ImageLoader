@@ -47,7 +47,7 @@ namespace ImageCaching
 	/// <summary>
 	/// Specifies the result of placing an image into the cache, which could either add new data to the cache, or update existing data.
 	/// </summary>
-	enum AddOrUpdateImageResult
+	enum TryAddImageResult
 	{
 		/// <summary>
 		/// The provided image was not present in the cache at any size and was added.
@@ -61,18 +61,7 @@ namespace ImageCaching
 		AddedAsResizedImage,
 
 		/// <summary>
-		/// The provided image already existed, but was a different instance and has replaced the instance in the cache.
-		/// </summary>
-		Updated,
-
-		/// <summary>
-		/// The provided image already existed as a resized copy of the source data from which it was loaded, but was a different instance and 
-		/// has replaced the instance which is in the cache.
-		/// </summary>
-		UpdatedAsResizedImage,
-
-		/// <summary>
-		/// The provided image already existed in the cache, and so no change was effected.
+		/// The provided image already existed in the cache at the provided key, and so no change was effected.
 		/// </summary>
 		NoChange
 	};
@@ -108,12 +97,11 @@ namespace ImageCaching
 			unsigned int width, unsigned int height, const IImage*& outImage) = 0;
 		
 		/// <summary>
-		/// Adds the image to the cache, or if the image already exists in the cache but with different pixel data than the provided instance
-		/// the 
+		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
 		/// </summary>
-		/// <param name="image">The image to add or update into the cache.</param>
+		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual AddOrUpdateImageResult AddOrUpdateImage(const IImage* image) = 0;
+		virtual TryAddImageResult TryAddImage(const IImage* image) = 0;
 
 		/// <summary>
 		/// Tries to remove the provided image from the cache.
@@ -269,12 +257,11 @@ namespace ImageCaching
 			const IImage*& outImage) override;
 
 		/// <summary>
-		/// Adds the image to the cache, or if the image already exists in the cache but with different pixel data than the provided instance
-		/// the 
+		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
 		/// </summary>
-		/// <param name="image">The image to add or update into the cache.</param>
+		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual AddOrUpdateImageResult AddOrUpdateImage(const IImage* image) override;
+		virtual TryAddImageResult TryAddImage(const IImage* image) override;
 
 		/// <summary>
 		/// Tries to remove the provided image from the cache.
