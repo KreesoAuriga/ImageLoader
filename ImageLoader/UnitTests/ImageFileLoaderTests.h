@@ -19,12 +19,12 @@ namespace UnitTests
 	public:
 		TestResult LoadFile(const std::string& fileName, int expectedWidth, int expectedHeight, std::string& outMessage)
 		{
-			auto loader = new ImageFileLoader();
+			auto loader = new ImageDataReader();
 
 			auto path = UnitTestsSetup::GetTestDataPath();
 			path /= fileName;
 
-			const ImageFileData* loadedFile = loader->LoadFile(path);
+			const ImageData* loadedFile = loader->ReadFile(path);
 
 			assert(loadedFile->Width == expectedWidth);
 			assert(loadedFile->Height == expectedHeight);

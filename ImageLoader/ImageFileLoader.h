@@ -4,15 +4,15 @@
 #include <filesystem>
 
 /// <summary>
-/// Container for file data which includes the size.
+/// Container for image file data which includes the image dimensions.
 /// </summary>
-struct ImageFileData
+struct ImageData
 {
 	const int Width;
 	const int Height;
 	const unsigned char* Data;
 
-	ImageFileData(int width, int height, const unsigned char* data)
+	ImageData(int width, int height, const unsigned char* data)
 		: Width(width)
 		, Height(height)
 		, Data(data)
@@ -22,19 +22,38 @@ struct ImageFileData
 		assert((data, "data cannot be null"));
 	}
 
-	~ImageFileData()
+	~ImageData()
 	{
 		delete[] Data;
 	}
 };
 
-struct IImageFileLoader
+/// <summary>
+/// Interface that loads image data from a path.
+/// </summary>
+struct IImageDataReader
 {
-	virtual const ImageFileData* LoadFile(const std::filesystem::path& filePath) const = 0;
+	/// <summary>
+	/// Reads the data for an image file from a path.
+	/// </summary>
+	/// <param name="filePath">The absolute path to the file.</param>
+	/// <returns>Image data with dimensions.</returns>
+	[[nodiscard]]
+	virtual const ImageData* ReadFile(const std::filesystem::path& filePath) const = 0;
 };
 
-class ImageFileLoader : public IImageFileLoader
+
+/// <summary>
+/// Default implementation of the <see cref="IImageFileLoader"/> interface.
+/// </summary>
+class ImageDataReader : public IImageDataReader
 {
 public:
-	virtual const ImageFileData* LoadFile(const std::filesystem::path& filePath) const override;
+	/// <summary>
+	/// Reads the data for an image file from a path on
+	/// </summary>
+	/// <param name="filePath">The absolute path to the file.</param>
+	/// <returns>Image data with dimensions.</returns>
+	[[nodiscard]]
+	virtual const ImageData* ReadFile(const std::filesystem::path& filePath) const override;
 };

@@ -44,9 +44,6 @@ namespace ImageCache
 	class ImageCache : public IImageCache
 	{
 		std::map<std::string, IImage*> _images;
-
-
-
 	};
 
 }

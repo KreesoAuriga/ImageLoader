@@ -27,14 +27,14 @@ bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImag
 		return true;
 
 
-	std::promise<ImageFileData*> promise;
-	std::future<ImageFileData*> future = promise.get_future();
+	std::promise<ImageData*> promise;
+	std::future<ImageData*> future = promise.get_future();
 
     std::thread t([&promise, filePath]
     {
         try
         {
-            auto imageFileLoader = new ImageFileLoader();
+            auto imageFileLoader = new ImageDataReader();
             const auto fileData = imageFileLoader->LoadFile(filePath);
 
             // code that may throw
@@ -51,7 +51,7 @@ bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImag
         }
     });
 
-    const ImageFileData* imageFileData = nullptr;
+    const ImageData* imageFileData = nullptr;
     try
     {
         imageFileData = future.get();

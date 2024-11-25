@@ -62,7 +62,7 @@ protected:
 
 public:
 	Image(const std::filesystem::path& sourcePath, int width, int height, const unsigned char* imageData)
-		: _sourcePath(std::move(sourcePath))
+		: _sourcePath(sourcePath)
 		, _width(width)
 		, _height(height)
 		, _imageData(imageData)
