@@ -43,13 +43,13 @@ struct IImageLoader
 /// </summary>
 class ImageLoader : public IImageLoader
 {
-	ImageCache::IImageCache* _imageCache;
+	ImageCaching::IImageCache* _imageCache;
 	std::mutex _cacheLock;
 
 private:
 
 public:
-	ImageLoader(ImageCache::IImageCache* imageCache);
+	ImageLoader(ImageCaching::IImageCache* imageCache);
 
 	/// <summary>
 	/// Sets the maximum number of threads the loader is allowed to use for loading images. A value of 0 specifies that 

@@ -7,7 +7,7 @@
 #include <iostream>
 
 
-ImageLoader::ImageLoader(ImageCache::IImageCache* imageCache)
+ImageLoader::ImageLoader(ImageCaching::IImageCache* imageCache)
 	: _imageCache(imageCache)
 
 {
@@ -65,6 +65,7 @@ bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImag
     t.join();
 
     outImage = new Image(filePath, imageFileData->Width, imageFileData->Height, imageFileData->Data);
+    _imageCache->
 
 	return true;
 }
