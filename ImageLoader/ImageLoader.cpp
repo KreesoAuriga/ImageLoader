@@ -1,5 +1,5 @@
-#include "Image.h"
 #include "ImageLoader.h"
+#include "Image.h"
 #include "ImageFileLoader.h"
 #include <cassert>
 #include <future>
@@ -11,7 +11,7 @@ ImageLoader::ImageLoader(ImageCaching::IImageCache* imageCache)
 	: _imageCache(imageCache)
 
 {
-	assert(imageCache, "ImageCache cannot be null");
+	assert((imageCache, "ImageCache cannot be null"));
 }
 
 void ImageLoader::SetMaxThreadCount(int count)
@@ -21,21 +21,22 @@ void ImageLoader::SetMaxThreadCount(int count)
 bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImage*& outImage)
 {
 
-	std::lock_guard<std::mutex> lockGuard(_cacheLock);
+	//std::lock_guard<std::mutex> lockGuard(_cacheLock);
 
-	if (_imageCache->TryGetImage(filePath, outImage))
+	if (_imageCache->TryGetImage(filePath, outImage) != ImageCaching::TryGetImageResult::NotFound )
 		return true;
 
 
-	std::promise<ImageData*> promise;
-	std::future<ImageData*> future = promise.get_future();
+	std::promise<const ImageData*> promise;
+	std::future<const ImageData*> future = promise.get_future();
 
     std::thread t([&promise, filePath]
     {
         try
         {
             auto imageFileLoader = new ImageDataReader();
-            const auto fileData = imageFileLoader->LoadFile(filePath);
+            const auto fileData = imageFileLoader->ReadFile(filePath);
+            promise.set_value(fileData);
 
             // code that may throw
             //throw std::runtime_error("Example");
@@ -55,6 +56,7 @@ bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImag
     try
     {
         imageFileData = future.get();
+        imageFileData = imageFileData;
     }
     catch (const std::exception& e)
     {
@@ -65,12 +67,17 @@ bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImag
     t.join();
 
     outImage = new Image(filePath, imageFileData->Width, imageFileData->Height, imageFileData->Data);
-    _imageCache->
+    _imageCache->AddOrUpdateImage(outImage);
 
 	return true;
 }
 
-bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, int width, int height, const IImage*& outImage)
+bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height, const IImage*& outImage)
 {
-	return false;
+    return false;
+}
+
+
+void ImageLoader::ReleaseImage(const std::filesystem::path& filePath)
+{
 }

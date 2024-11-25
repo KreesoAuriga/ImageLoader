@@ -2,12 +2,44 @@
 
 using namespace ImageCaching;
 
-void ImageCache::SetMaxMemory(unsigned int maximumMemoryInBytes)
+
+void ImageCache::SetMaxMemory(int64_t maximumMemoryInBytes)
 {
+	if (maximumMemoryInBytes < 0)
+		throw std::runtime_error("Max memory must be positive");
+
 	_maxAllowedMemory = maximumMemoryInBytes;
 	//TODO: zoea 25/11/2024 remove items if needed when the memory cap is reduced.
 }
 
+
+void ImageCache::CheckMemoryUsage()
+{
+	while (_currentMemoryUsage > _maxAllowedMemory)
+	{
+		std::time_t earliestAccessTime = std::numeric_limits<time_t>::max();
+		ImageCacheEntry* earliestCacheEntry = nullptr;
+
+		for (auto entry : _images)
+		{
+			const auto entryTime = entry.second->SourceImageItem.GetLastAccessedTime();
+			if (entryTime < earliestAccessTime)
+			{
+				earliestAccessTime = entryTime;
+				earliestCacheEntry = entry.second;
+			}
+		}
+
+		if (!earliestCacheEntry)
+			break;
+
+		const auto sizeOfEarliestItem = earliestCacheEntry->GetTotalSizeInBytes();
+		_currentMemoryUsage -= sizeOfEarliestItem;
+
+		_images.erase(earliestCacheEntry->ImagePath.string());
+		delete earliestCacheEntry;
+	}
+}
 
 TryGetImageResult ImageCache::TryGetImage(const std::filesystem::path& imagePath, const IImage* outImage)
 {
@@ -55,7 +87,7 @@ TryGetImageResult ImageCache::TryGetImageAtSize(
 		if (cacheEntry->ResizedImages)
 		{
 			const auto& resizedImages = *cacheEntry->ResizedImages;
-			const auto resizedImageKey = ResizedImageKey(width, height);
+			const auto resizedImageKey = ResizedImageKey(width, height).ToString();
 			if (auto resizedSearch = resizedImages.find(resizedImageKey); resizedSearch != resizedImages.end())
 			{
 				outImage = resizedSearch->second->Image;
@@ -75,7 +107,7 @@ TryGetImageResult ImageCache::TryGetImageAtSize(
 
 AddOrUpdateImageResult ImageCache::AddOrUpdateImage(const IImage* image)
 {
-	/*
+	
 	std::lock_guard<std::mutex> lockGuard(_cacheLock);
 
 	const auto key = image->GetImagePath().string();
@@ -101,7 +133,7 @@ AddOrUpdateImageResult ImageCache::AddOrUpdateImage(const IImage* image)
 			return AddOrUpdateImageResult::Updated;
 		}
 
-		const auto resizedImageKey = ResizedImageKey(image->GetWidth(), image->GetHeight());
+		const auto resizedImageKey = ResizedImageKey(image->GetWidth(), image->GetHeight()).ToString();
 
 		//If there are copies of the image at different sizes, check for a match.
 		if (cacheEntry->ResizedImages)
@@ -124,15 +156,24 @@ AddOrUpdateImageResult ImageCache::AddOrUpdateImage(const IImage* image)
 		//ensure the resized images map exists.
 		if (!cacheEntry->ResizedImages)
 		{
-			cacheEntry->ResizedImages = new std::map<const ResizedImageKey, ImageCacheItem*>();
+			cacheEntry->ResizedImages = new std::map<const std::string, ImageCacheItem*>();
 		}
 
 
-		//cacheEntry->ResizedImages->insert({ resizedImageKey, new ImageCacheItem(image) });
+		(*cacheEntry->ResizedImages)[resizedImageKey] = new ImageCacheItem(image);
+		_currentMemoryUsage += image->GetSizeInBytes();
+		CheckMemoryUsage();
 		return AddOrUpdateImageResult::AddedAsResizedImage;
 	}
 
-	//_images.insert({ key, new ImageCacheEntry(image) });
-	*/
+	_images[key] = new ImageCacheEntry(image);
+	_currentMemoryUsage += image->GetSizeInBytes();
+
+	CheckMemoryUsage();
 	return AddOrUpdateImageResult::Added;
+}
+
+bool ImageCaching::ImageCache::TryRemoveImage(const IImage* image)
+{
+	return false;
 }

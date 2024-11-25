@@ -78,5 +78,5 @@ public:
 	/// the image that have been resized.
 	/// </summary>
 	/// <param name="filePath">The path to the file.</param>
-	virtual void ReleaseImage(const std::filesystem::path& filePath) = 0;
+	virtual void ReleaseImage(const std::filesystem::path& filePath) override;
 };

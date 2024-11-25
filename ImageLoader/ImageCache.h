@@ -83,12 +83,12 @@ namespace ImageCaching
 		/// Sets the maximum memory in bytes that the cache is allowed to use. 
 		/// </summary>
 		/// <param name="maximumMemoryInBytes"></param>
-		virtual void SetMaxMemory(unsigned int maximumMemoryInBytes) = 0;
+		virtual void SetMaxMemory(int64_t maximumMemoryInBytes) = 0;
 
 		/// <summary>
 		/// Gets the maximum memory in bytes that the cache is allowed to use.
 		/// </summary>
-		virtual int GetMaxMemory() const = 0;
+		virtual int64_t GetMaxMemory() const = 0;
 
 		/// <summary>
 		/// Attempts to get the image identified by the specified path.
@@ -133,6 +133,12 @@ namespace ImageCaching
 			, Height(height)
 		{
 		}
+
+		std::string ToString()
+		{
+			std::string result = std::to_string(Width) + ":" + std::to_string(Height);
+			return result;
+		}
 	};
 
 	class ImageCacheItem
@@ -144,7 +150,9 @@ namespace ImageCaching
 
 		ImageCacheItem(const IImage* image)
 			: Image(image)
+			, _lastAccessedTime(std::time_t())
 		{
+			UpdateLastAccessedTime();
 		}
 
 		/// <summary>
@@ -172,12 +180,40 @@ namespace ImageCaching
 		const std::filesystem::path ImagePath;
 		ImageCacheItem SourceImageItem;
 
-		std::map<const ResizedImageKey, ImageCacheItem*>* ResizedImages = nullptr;
+		std::map<const std::string, ImageCacheItem*>* ResizedImages = nullptr;
 
 		ImageCacheEntry(const IImage* image)
 			: ImagePath(image->GetImagePath())
 			, SourceImageItem(ImageCacheItem(image))
 		{
+		}
+
+		~ImageCacheEntry()
+		{
+			if (ResizedImages)
+			{
+				for (auto entry : *ResizedImages)
+					delete entry.second;
+
+				delete ResizedImages;
+			}
+
+			delete SourceImageItem.Image;
+		}
+
+		unsigned int GetTotalSizeInBytes()
+		{
+			unsigned int result = SourceImageItem.Image->GetSizeInBytes();
+
+			if (ResizedImages)
+			{
+				for (auto resizedEntry : *ResizedImages)
+				{
+					result += resizedEntry.second->Image->GetSizeInBytes();
+				}
+			}
+
+			return result;
 		}
 	};
 
@@ -187,12 +223,16 @@ namespace ImageCaching
 	/// </summary>
 	class ImageCache : public IImageCache
 	{
-		int _maxAllowedMemory;
+		int64_t _maxAllowedMemory;
+		int64_t _currentMemoryUsage = 0;
 		std::mutex _cacheLock;
 		std::map<const std::string, ImageCacheEntry*> _images;
 
+	private:
+		void CheckMemoryUsage();
+
 	public:
-		ImageCache(int maximumMemoryInBytes)
+		ImageCache(int64_t maximumMemoryInBytes)
 		{
 			SetMaxMemory(maximumMemoryInBytes);
 		}
@@ -201,12 +241,12 @@ namespace ImageCaching
 		/// Sets the maximum memory in bytes that the cache is allowed to use. 
 		/// </summary>
 		/// <param name="maximumMemoryInBytes"></param>
-		virtual void SetMaxMemory(unsigned int maximumMemoryInBytes) override;
+		virtual void SetMaxMemory(int64_t maximumMemoryInBytes) override;
 
 		/// <summary>
 		/// Gets the maximum memory in bytes that the cache is allowed to use.
 		/// </summary>
-		virtual int GetMaxMemory() const override {
+		virtual int64_t GetMaxMemory() const override {
 			return _maxAllowedMemory;
 		}
 

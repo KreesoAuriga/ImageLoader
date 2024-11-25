@@ -40,6 +40,12 @@ public:
 	/// </summary>
 	[[nodiscard]]
 	virtual std::filesystem::path GetImagePath() const = 0;
+
+	/// <summary>
+	/// Gets the size in bytes of the image.
+	/// </summary>
+	[[nodiscard]]
+	virtual unsigned int GetSizeInBytes() const = 0;
 };
 
 struct IImageResized : public IImage
@@ -69,11 +75,16 @@ public:
 	{
 	}
 
+	~Image()
+	{
+		delete[] _imageData;
+	}
+
 	/// <summary>
 	/// Gets the width in pixels of this image.
 	/// </summary>
 	[[nodiscard]]
-	virtual int GetWidth() const {
+	virtual int GetWidth() const override {
 		return _width;
 	}
 
@@ -81,7 +92,7 @@ public:
 	/// Gets the height in pixels of this image.
 	/// </summary>
 	[[nodiscard]]
-	virtual int GetHeight() const {
+	virtual int GetHeight() const override {
 		return _height;
 	}
 
@@ -89,7 +100,7 @@ public:
 	/// Gets the <see cref="ImageFormat"/> of this image as stored in memory.
 	/// </summary>
 	[[nodiscard]]
-	virtual ImageFormat GetNativeImageFormat() const {
+	virtual ImageFormat GetNativeImageFormat() const override {
 		return ImageFormat::RGB8;
 	}
 
@@ -98,7 +109,7 @@ public:
 	/// </summary>
 	/// <param name="imageFormat">The format to return the image in.</param>
 	[[nodiscard]]
-	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const {
+	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const override {
 		return _imageData;
 	}
 
@@ -106,10 +117,20 @@ public:
 	/// Gets the path from which image was originally loaded.
 	/// </summary>
 	[[nodiscard]]
-	virtual std::filesystem::path GetImagePath() const {
+	virtual std::filesystem::path GetImagePath() const override {
 		return _sourcePath;
 	}
 
+	/// <summary>
+	/// Gets the size in bytes of the image.
+	/// </summary>
+	[[nodiscard]]
+	virtual unsigned int GetSizeInBytes() const override
+	{
+		//TODO: zoea 25/11/2024 make this properly handle images with channel count other than 4 and 
+		//pixels more than 8 bits per channel
+		return _width * _height * 4;
+	}
 };
 
 class ImageResized : public Image
