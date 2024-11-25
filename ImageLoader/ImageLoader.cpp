@@ -18,7 +18,7 @@ void ImageLoader::SetMaxThreadCount(int count)
 {
 }
 
-bool ImageLoader::TryGetImage(const std::string& filePath, const IImage*& outImage)
+bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, const IImage*& outImage)
 {
 
 	std::lock_guard<std::mutex> lockGuard(_cacheLock);
@@ -69,7 +69,7 @@ bool ImageLoader::TryGetImage(const std::string& filePath, const IImage*& outIma
 	return true;
 }
 
-bool ImageLoader::TryGetImage(const std::string& filePath, int width, int height, const IImage*& outImage)
+bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, int width, int height, const IImage*& outImage)
 {
 	return false;
 }

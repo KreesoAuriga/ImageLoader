@@ -1,5 +1,5 @@
-
 #pragma once
+#include <filesystem>
 
 enum ImageFormat
 {	
@@ -39,7 +39,7 @@ public:
 	/// Gets the path from which image was originally loaded.
 	/// </summary>
 	[[nodiscard]]
-	virtual std::string GetImagePath() const = 0;
+	virtual std::filesystem::path GetImagePath() const = 0;
 };
 
 struct IImageResized : public IImage
@@ -58,10 +58,10 @@ protected:
 	int _height;
 	const unsigned char* _imageData;
 
-	std::string _sourcePath;
+	const std::filesystem::path _sourcePath;
 
 public:
-	Image(const std::string& sourcePath, int width, int height, const unsigned char* imageData)
+	Image(const std::filesystem::path& sourcePath, int width, int height, const unsigned char* imageData)
 		: _sourcePath(std::move(sourcePath))
 		, _width(width)
 		, _height(height)
@@ -106,7 +106,7 @@ public:
 	/// Gets the path from which image was originally loaded.
 	/// </summary>
 	[[nodiscard]]
-	virtual std::string GetImagePath() const {
+	virtual std::filesystem::path GetImagePath() const {
 		return _sourcePath;
 	}
 
@@ -118,7 +118,7 @@ private:
 	const Image* _parentImage;
 
 public:
-	ImageResized(const Image* parentImage, unsigned int width, unsigned int height, char* imageData)
+	ImageResized(const Image* parentImage, unsigned int width, unsigned int height, const unsigned char* imageData)
 		: _parentImage(parentImage)
 		, Image(parentImage->GetImagePath(), width, height, imageData)
 	{

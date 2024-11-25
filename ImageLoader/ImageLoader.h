@@ -18,7 +18,7 @@ struct IImageLoader
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual bool TryGetImage(const std::string& filePath, IImage*& outImage) = 0;
+	virtual bool TryGetImage(const std::filesystem::path& filePath, const IImage*& outImage) = 0;
 
 	/// <summary>
 	/// Attempts to get the image at the specified path, and at the specified size. Returns false if the image could not be obtained.
@@ -26,13 +26,13 @@ struct IImageLoader
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual bool TryGetImage(const std::string& filePath, unsigned int width, unsigned int height, IImage*& outImage) = 0;
+	virtual bool TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height, const IImage*& outImage) = 0;
 
 	/// <summary>
 	/// Unloads the image, freeing up it's memory and removing it from any caching mechanisms.
 	/// </summary>
 	/// <param name="filePath">The file path of the file.</param>
-	virtual void ReleaseImage(const std::string& filePath) = 0;
+	virtual void ReleaseImage(const std::filesystem::path& filePath) = 0;
 };
 
 class ImageLoader : public IImageLoader
@@ -47,8 +47,8 @@ public:
 
 	virtual void SetMaxThreadCount(int count) override;
 
-	virtual bool TryGetImage(const std::string& filePath, const IImage*& outImage) override;
+	virtual bool TryGetImage(const std::filesystem::path& filePath, const IImage*& outImage) override;
 
-	virtual bool TryGetImage(const std::string& filePath, unsigned int width, unsigned int height, const IImage*& outImage) override;
+	virtual bool TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height, const IImage*& outImage) override;
 
 };
