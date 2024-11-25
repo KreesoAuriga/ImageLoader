@@ -4,7 +4,7 @@ Created in Visual Studio 2022 as a CMake 'project' to allow it to be cross platf
 
 Major functionality declared as abstract classes, serving as interfaces.
 The default implementations of these interfaces are currently defined in the same files as the interfaces. A more completed implementation would move the implementations to different files inside of separate namespaces.
-The major functionality is intended for implementations to accept interfaces, allowing for dependency injection and for these types to be agnostic of implementation. This also facilitates unit testing by allowing mock implementations of interfaces in order to test functions without needing to construct fully implemented objects which depend on other objects also being full implemented.
+The major functionality is intended for implementations to accept interfaces, allowing for dependency injection and for these types to be agnostic of implementation. This also facilitates unit testing by allowing mock implementations of interfaces in order to test functions without needing to construct fully implemented objects which depend on other objects also being fully implemented.
 
 The main program function currently serves to execute test code, whereas a complete implementation would move this code to a dedicated test project, including ImageLoader as a library.
 
