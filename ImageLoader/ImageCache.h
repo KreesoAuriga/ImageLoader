@@ -66,6 +66,7 @@ namespace ImageCaching
 		NoChange
 	};
 
+	template<typename TImage>
 	struct IImageCache
 	{
 		/// <summary>
@@ -85,7 +86,7 @@ namespace ImageCaching
 		/// <param name="imagePath">Source path of the image.</param>
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, const IImage* outImage) = 0;
+		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, const TImage* outImage) = 0;
 
 		/// <summary>
 		/// Attempts to get the image identified by the specified path, with the specified width and height in pixels.
@@ -94,21 +95,21 @@ namespace ImageCaching
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>Result of the operation</returns>
 		virtual TryGetImageResult TryGetImageAtSize(const std::filesystem::path& imagePath,
-			unsigned int width, unsigned int height, const IImage*& outImage) = 0;
+			unsigned int width, unsigned int height, const TImage*& outImage) = 0;
 		
 		/// <summary>
 		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
 		/// </summary>
 		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryAddImageResult TryAddImage(const IImage* image) = 0;
+		virtual TryAddImageResult TryAddImage(const TImage* image) = 0;
 
 		/// <summary>
 		/// Tries to remove the provided image from the cache.
 		/// </summary>
 		/// <param name="image">The image to remove.</param>
 		/// <returns>True if the image was removed, false if the image was not found in the cache.</returns>
-		virtual bool TryRemoveImage(const IImage* image) = 0;
+		virtual bool TryRemoveImage(const TImage* image) = 0;
 	};
 
 	struct ResizedImageKey
@@ -129,51 +130,41 @@ namespace ImageCaching
 		}
 	};
 
+	template<typename TImage>
 	class ImageCacheItem
 	{
-		std::time_t _lastAccessedTime;
+
+		std::weak_ptr<const TImage> _image;
 
 	public:
-		const IImage* Image;
 
-		ImageCacheItem(const IImage* image)
-			: Image(image)
-			, _lastAccessedTime(std::time_t())
+		ImageCacheItem(const std::shared_ptr<const IImage>& image)
+			: _image(image)
 		{
-			UpdateLastAccessedTime();
 		}
 
-		/// <summary>
-		/// Updates the last accessed time to the current time.
-		/// </summary>
-		void UpdateLastAccessedTime()
+		std::shared_ptr<const IImage> GetImage()
 		{
-			auto now = std::chrono::system_clock::now();
-			_lastAccessedTime = std::chrono::system_clock::to_time_t(now);
+			return _image.lock();
 		}
 
-		/// <summary>
-		/// Gets the last accessed time.
-		/// </summary>
-		/// <returns></returns>
-		[[nodiscard]]
-		std::time_t GetLastAccessedTime() const
-		{
-			return _lastAccessedTime;
-		}
 	};
 
+	template<typename TImage>
 	struct ImageCacheEntry
 	{
+
 		const std::filesystem::path ImagePath;
-		ImageCacheItem SourceImageItem;
+		const ImageSource* SourceImage;
+		//ImageCacheItem SourceImageItem;
 
-		std::map<const std::string, ImageCacheItem*>* ResizedImages = nullptr;
+		std::map<const std::string, ImageCacheItem<TImage>*> ResizedImages;
 
-		ImageCacheEntry(const IImage* image)
-			: ImagePath(image->GetImagePath())
-			, SourceImageItem(ImageCacheItem(image))
+		ImageCacheEntry(const ImageSource* sourceImage)
+			: ImagePath(sourceImage->GetImagePath())
+			, SourceImage(ImageCacheItem<TImage>(sourceImage))
 		{
+			static_assert(std::is_convertible<TImage*, IImage*>::value, "TImage type must inherit from IImage.");
 		}
 
 		~ImageCacheEntry()
@@ -186,12 +177,12 @@ namespace ImageCaching
 				delete ResizedImages;
 			}
 
-			delete SourceImageItem.Image;
+			delete SourceImage;
 		}
 
 		unsigned int GetTotalSizeInBytes()
 		{
-			unsigned int result = SourceImageItem.Image->GetSizeInBytes();
+			unsigned int result = SourceImage->GetSizeInBytes();
 
 			if (ResizedImages)
 			{
@@ -209,19 +200,23 @@ namespace ImageCaching
 	/// Default implementation of <see cref="IImageCache"/>. This implementation is not threadsafe, and thread safety must be implemented
 	/// by 
 	/// </summary>
-	class ImageCache : public IImageCache
+	template<typename TImage>
+	class ImageCache : public IImageCache<TImage>
 	{
 		int64_t _maxAllowedMemory;
 		int64_t _currentMemoryUsage = 0;
-		std::mutex _cacheLock;
-		std::map<const std::string, ImageCacheEntry*> _images;
+		std::recursive_mutex _cacheLock;
+		std::map<const std::string, ImageCacheEntry<TImage>*> _images;
 
 	private:
 		void CheckMemoryUsage();
 
+
+
 	public:
 		ImageCache(int64_t maximumMemoryInBytes)
 		{
+			static_assert(std::is_convertible< TImage*, IImage*>::value, "TImage type must inherit from IImage.");
 			SetMaxMemory(maximumMemoryInBytes);
 		}
 
@@ -244,7 +239,7 @@ namespace ImageCaching
 		/// <param name="imagePath">Source path of the image.</param>
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>True if the image was in the cache and was retrieved, false otherwise.</returns>
-		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, const IImage* outImage) override;
+		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, const TImage* outImage) override;
 
 		/// <summary>
 		/// Attempts to get the image identified by the specified path, with the specified width and height in pixels.
@@ -254,21 +249,37 @@ namespace ImageCaching
 		/// <returns>True if the image was in the cache and was retrieved, false otherwise.
 		virtual TryGetImageResult TryGetImageAtSize(const std::filesystem::path& imagePath, 
 			unsigned int width, unsigned int height, 
-			const IImage*& outImage) override;
+			const TImage*& outImage) override;
 
 		/// <summary>
 		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
 		/// </summary>
 		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryAddImageResult TryAddImage(const IImage* image) override;
+		virtual TryAddImageResult TryAddImage(const TImage* image) override;
+
+		virtual TryAddImageResult TryAddSourceImage(const IImageSource* image) override;
 
 		/// <summary>
 		/// Tries to remove the provided image from the cache.
 		/// </summary>
 		/// <param name="image">The image to remove.</param>
 		/// <returns>True if the image was removed, false if the image was not found in the cache.</returns>
-		virtual bool TryRemoveImage(const IImage* image) override;
+		virtual bool TryRemoveImage(const TImage* image) override;
+
+	private:
+
+		// Function to create a shared_ptr with a callback on destruction
+		std::shared_ptr<const TImage> make_shared_with_callback(const TImage* ptr){//, std::function<void()> onDestroy) {
+			return std::shared_ptr<const TImage>(ptr, [onDestroy](const TImage* obj) {
+				TryRemoveImage(obj);
+				delete obj;          // Clean up the object
+				//if (onDestroy) {     // Call the callback
+				//	onDestroy();
+				//}
+			});
+		}
+
 	};
 
 }

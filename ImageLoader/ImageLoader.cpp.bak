@@ -1,0 +1,141 @@
+#include "ImageLoader.h"
+#include "Image.h"
+#include "ImageFileLoader.h"
+#include <cassert>
+#include <future>
+#include <thread>
+#include <iostream>
+
+
+ImageLoader::ImageLoader(ImageCaching::IImageCache* imageCache, int maxThreadCount)
+	: _imageCache(imageCache)
+    , _maxThreadCount(maxThreadCount)
+
+{
+	assert((imageCache, "ImageCache cannot be null"));
+}
+
+void ImageLoader::SetMaxThreadCount(int count)
+{
+    _maxThreadCount = count;
+}
+
+struct ThreadContainer
+{
+    std::promise<const ImageData*> promise;
+
+};
+
+
+std::future<const IImage*> ImageLoader::TryGetImage(const std::filesystem::path& filePath)
+{
+    
+    std::promise<const IImage*> imagePromise;
+    std::future<const IImage*> imageFuture = imagePromise.get_future();
+    
+    const IImage* cachedImage = nullptr;
+    if (_imageCache->TryGetImage(filePath, cachedImage) != ImageCaching::TryGetImageResult::NotFound)
+    {
+        imagePromise.set_value(cachedImage);
+        return imageFuture;
+    }
+    /*
+    std::promise<const ImageData*> promise;
+    std::future<const ImageData*> future = promise.get_future();
+    */
+
+    ImageLoader* imageLoader = this;
+    /*
+    std::mutex* activeThreadCountMutex = &_activeThreadCountMutex;
+
+    std::mutex* taskWaitConditionsMutex = &_taskWaitConditionsMutex;
+    std::vector<WaitCondition*>* taskWaitConditions = &_taskWaitConditions;
+    */
+
+    auto* imageCache = _imageCache;
+    std::thread t([imagePromise = std::move(imagePromise), filePath, imageCache, imageLoader]() mutable
+    {
+        auto waitCondition = new WaitCondition();
+        bool mustWait = false;
+        size_t waitConditionCount;
+        {
+            std::lock_guard<std::mutex> lockGuard(imageLoader->_taskWaitConditionsMutex);
+            imageLoader->_taskWaitConditions.push_back(waitCondition);
+            mustWait = imageLoader->_taskWaitConditions.size() < imageLoader->_maxThreadCount;
+        }
+         
+        if( mustWait )
+            waitCondition->Wait();
+
+        {
+            std::lock_guard<std::mutex> lockGuard(imageLoader->_taskWaitConditionsMutex);
+            imageLoader->_activeThreadCount++;//for debugging
+        }
+
+        try
+        {
+            auto imageFileLoader = new ImageDataReader();
+            const auto fileData = imageFileLoader->ReadFile(filePath);
+
+            const auto* image = new Image(filePath, fileData->Width, fileData->Height, fileData->Data);
+            imageCache->AddOrUpdateImage(image);
+            imagePromise.set_value(image);
+            // code that may throw
+            //throw std::runtime_error("Example");
+        }
+        catch (...)
+        {
+            try
+            {
+                // store anything thrown in the promise
+                imagePromise.set_exception(std::current_exception());
+            }
+            catch (...) {} // set_exception() may throw too
+        }
+
+        {
+            std::lock_guard<std::mutex> lockGuard(imageLoader->_taskWaitConditionsMutex);
+            auto& waitConditions = imageLoader->_taskWaitConditions;
+            waitConditions.erase(find(waitConditions.begin(), waitConditions.end(), waitCondition));
+
+            imageLoader->_activeThreadCount--;//for debugging
+
+            if (!waitConditions.empty())
+                waitConditions[0]->Signal();
+        }
+
+    });
+
+    t.detach();
+
+    return imageFuture;
+    /*
+    const ImageData* imageFileData = nullptr;
+    try
+    {
+        imageFileData = future.get();
+        imageFileData = imageFileData;
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << "Exception from the thread: " << e.what() << '\n';
+        return false;
+    }
+
+    t.join();
+
+    outImage = new Image(filePath, imageFileData->Width, imageFileData->Height, imageFileData->Data);
+    _imageCache->AddOrUpdateImage(outImage);
+
+	return true;*/
+}
+
+bool ImageLoader::TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height, const IImage*& outImage)
+{
+    return false;
+}
+
+
+void ImageLoader::ReleaseImage(const std::filesystem::path& filePath)
+{
+}

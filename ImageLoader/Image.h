@@ -7,6 +7,7 @@ enum ImageFormat
 	RGBA8
 };
 
+
 struct IImage
 {
 public:
@@ -22,21 +23,9 @@ public:
 	[[nodiscard]]
 	virtual int GetHeight() const = 0;
 
-	/// <summary>
-	/// Gets the <see cref="ImageFormat"/> of this image as stored in memory.
-	/// </summary>
-	[[nodiscard]]
-	virtual ImageFormat GetNativeImageFormat() const = 0;
 
 	/// <summary>
-	/// Gets the image data pixels, as raw image data
-	/// </summary>
-	/// <param name="imageFormat">The format to return the image in.</param>
-	[[nodiscard]]
-	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const = 0;
-
-	/// <summary>
-	/// Gets the path from which image was originally loaded.
+	/// Gets the path from which image was originally loaded. This also serves as a unique identifier in <see cref="IImageCache"/>.
 	/// </summary>
 	[[nodiscard]]
 	virtual std::filesystem::path GetImagePath() const = 0;
@@ -48,6 +37,24 @@ public:
 	virtual unsigned int GetSizeInBytes() const = 0;
 };
 
+struct IImageSource : public IImage
+{
+	/// <summary>
+	/// Gets the image data pixels, as raw image data
+	/// </summary>
+	/// <param name="imageFormat">The format to return the image in.</param>
+	[[nodiscard]]
+	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const = 0;
+
+	/*
+	/// <summary>
+	/// Gets the <see cref="ImageFormat"/> of this image as stored in memory.
+	/// </summary>
+	[[nodiscard]]
+	virtual ImageFormat GetNativeImageFormat() const = 0;
+	*/
+};
+
 struct IImageResized : public IImage
 {
 	/// <summary>
@@ -57,7 +64,7 @@ struct IImageResized : public IImage
 	virtual const IImage* GetParentImage() = 0;
 };
 
-class Image : public IImage
+class ImageSource : public IImageSource
 {
 protected:
 	int _width;
@@ -67,7 +74,7 @@ protected:
 	const std::filesystem::path _sourcePath;
 
 public:
-	Image(const std::filesystem::path& sourcePath, int width, int height, const unsigned char* imageData)
+	ImageSource(const std::filesystem::path& sourcePath, int width, int height, const unsigned char* imageData)
 		: _sourcePath(sourcePath)
 		, _width(width)
 		, _height(height)
@@ -75,9 +82,9 @@ public:
 	{
 	}
 
-	~Image()
+	~ImageSource()
 	{
-		delete[] _imageData;
+		free((void*)_imageData);
 	}
 
 	/// <summary>
@@ -95,14 +102,14 @@ public:
 	virtual int GetHeight() const override {
 		return _height;
 	}
-
+	/*
 	/// <summary>
 	/// Gets the <see cref="ImageFormat"/> of this image as stored in memory.
 	/// </summary>
 	[[nodiscard]]
 	virtual ImageFormat GetNativeImageFormat() const override {
 		return ImageFormat::RGB8;
-	}
+	}*/
 
 	/// <summary>
 	/// Gets the image data pixels, as raw image data
@@ -133,15 +140,15 @@ public:
 	}
 };
 
-class ImageResized : public Image
+class ImageResized : public ImageSource
 {
 private:
-	const Image* _parentImage;
+	const ImageSource* _parentImage;
 
 public:
-	ImageResized(const Image* parentImage, unsigned int width, unsigned int height, const unsigned char* imageData)
+	ImageResized(const ImageSource* parentImage, unsigned int width, unsigned int height, const unsigned char* imageData)
 		: _parentImage(parentImage)
-		, Image(parentImage->GetImagePath(), width, height, imageData)
+		, ImageSource(parentImage->GetImagePath(), width, height, imageData)
 	{
 	}
 };

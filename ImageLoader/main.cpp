@@ -6,8 +6,9 @@
 #include <filesystem>
 
 #include "UnitTests/ImageFileLoaderTests.h"
+#include "UnitTests/TestImplementations.h"
 
-using namespace std;
+using namespace UnitTests;
 
 int main()
 {
@@ -24,8 +25,8 @@ int main()
 
 
 
-	auto imageCache = new ImageCaching::ImageCache(64 * 1024 * 1024);
-	auto imageLoader = new ImageLoader(imageCache, 4);
+	auto imageCache = new ImageCaching::ImageCache<TestImage>(64 * 1024 * 1024);
+	auto imageLoader = new ImageLoader<TestImage>(imageCache, 4);
 
 
 	const auto testImagePath1 = testDataPath / "@Response_05.bmp";

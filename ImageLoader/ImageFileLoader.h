@@ -22,10 +22,7 @@ struct ImageData
 		assert((data, "data cannot be null"));
 	}
 
-	~ImageData()
-	{
-		delete[] Data;
-	}
+	~ImageData();
 };
 
 /// <summary>
@@ -40,6 +37,7 @@ struct IImageDataReader
 	/// <returns>Image data with dimensions.</returns>
 	[[nodiscard]]
 	virtual const ImageData* ReadFile(const std::filesystem::path& filePath) const = 0;
+
 };
 
 
