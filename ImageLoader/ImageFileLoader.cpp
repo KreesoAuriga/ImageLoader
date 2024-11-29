@@ -10,9 +10,9 @@
 #define STBI_NO_HDR
 #define STBI_NO_PIC
 #define STBI_NO_PNM  // (.ppm and .pgm)
-#define STBI_FREE
-#define STBI_MALLOC
-#define STBI_REALLOC
+//#define STBI_FREE
+//#define STBI_MALLOC
+//#define STBI_REALLOC
 #include "stb/stb_image.h"
 
 const ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) const
@@ -31,5 +31,6 @@ const ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath
 
 ImageData::~ImageData()
 {
-	stbi_image_free((void*)Data);
+	if(Data)
+		free((void*)Data);
 }

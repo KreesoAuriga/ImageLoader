@@ -44,7 +44,10 @@ void ImageCache<TImage>::CheckMemoryUsage()
 }
 
 template<typename TImage>
-TryGetImageResult ImageCache<TImage>::TryGetImage(const std::filesystem::path& imagePath, const TImage* outImage)
+TryGetImageResult ImageCache<TImage>::TryGetImage(
+	const std::filesystem::path& imagePath,
+	const std::shared_ptr<const TImage>& outImage,
+	const ImageSource*& outSourceImage)
 {
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 
@@ -52,9 +55,16 @@ TryGetImageResult ImageCache<TImage>::TryGetImage(const std::filesystem::path& i
 	if (auto search = _images.find(key); search != _images.end())
 	{
 		ImageCacheEntry* cacheEntry = search->second;
-		outImage = cacheEntry->SourceImageItem.Image;
-		cacheEntry->SourceImageItem.UpdateLastAccessedTime();
-		return TryGetImageResult::FoundExactMatch;
+		outImage = cacheEntry->SourceImage;
+
+		const auto* resized = cacheEntry->TryGetResizedImageCacheItem(outImage->GetWidth(), outImage->GetHeight());
+		if (resized)
+		{
+			outImage = resized->GetImage();
+			return TryGetImageResult::FoundExactMatch;
+		}
+
+		return TryGetImageResult::FoundSourceImageOfDifferentDimensions;
 	}
 
 	outImage = nullptr;
@@ -65,8 +75,9 @@ template<typename TImage>
 TryGetImageResult ImageCache<TImage>::TryGetImageAtSize(
 	const std::filesystem::path& imagePath,
 	unsigned int width, 
-	unsigned int height, 
-	const TImage*& outImage) 
+	unsigned int height,
+	const std::shared_ptr<const TImage>& outImage,
+	const ImageSource*& outSourceImage)
 {
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 
@@ -75,25 +86,15 @@ TryGetImageResult ImageCache<TImage>::TryGetImageAtSize(
 	if (auto search = _images.find(key); search != _images.end())
 	{
 		ImageCacheEntry* cacheEntry = search->second;
-		const auto* sourceImageItem = cacheEntry->SourceImageItem.Image;
-		/*
-		if (sourceImageItem->GetWidth() == width && sourceImageItem->GetHeight() == height)
-		{
-			//The requested size is the source size.
-			outImage = cacheEntry->SourceImageItem.Image;
-			return TryGetImageResult::FoundExactMatch;
-		}*/
+		outImage = cacheEntry->SourceImage;
 
-		const auto& resizedImages = cacheEntry->ResizedImages;
-		const auto resizedImageKey = ResizedImageKey(width, height).ToString();
-		if (auto resizedSearch = resizedImages.find(resizedImageKey); resizedSearch != resizedImages.end())
+		const auto* resized = cacheEntry->TryGetResizedImageCacheItem(width, height);
+		if (resized)
 		{
-			outImage = resizedSearch->second->Image;
+			outImage = resized->GetImage();
 			return TryGetImageResult::FoundExactMatch;
 		}
 
-		//Return the source image if there was no cached copy at the specified dimensions
-		outImage = cacheEntry->SourceImageItem.Image;
 		return TryGetImageResult::FoundSourceImageOfDifferentDimensions;
 	}
 
@@ -125,11 +126,12 @@ TryAddImageResult ImageCache<TImage>::TryAddSourceImage(const IImageSource* imag
 }
 
 template<typename TImage>
-TryAddImageResult ImageCache<TImage>::TryAddImage(const TImage* image)
+TryAddImageResult ImageCache<TImage>::TryAddImage(const TImage* image, const TImage*& outImage)
 {
 	
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 
+	outImage = nullptr;
 	const auto key = image->GetImagePath().string();
 
 	std::shared_ptr<const IImage> sharedPtr = make_shared_with_callback(image);
@@ -165,12 +167,18 @@ TryAddImageResult ImageCache<TImage>::TryAddImage(const TImage* image)
 			{
 				auto* resizedImageItem = resizedSearch->second;
 				resizedImageItem->UpdateLastAccessedTime();
-				if( resizedImageItem->Image == image )
+				if (resizedImageItem->Image == image)
+				{
+					outImage = image;
 					return TryAddImageResult::NoChange;
+				}
 
-				if (resizedImageItem->Image->GetWidth() == image->GetWidth() && 
+				if (resizedImageItem->Image->GetWidth() == image->GetWidth() &&
 					resizedImageItem->Image->GetHeight() == image->GetHeight())
+				{
+					outImage = image;
 					return TryAddImageResult::NoChange;
+				}
 			}
 		}
 

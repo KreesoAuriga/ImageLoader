@@ -1,6 +1,6 @@
 #pragma once
 
-#namespace UnitTests
+namespace UnitTests
 {
 
 	class TestImage final : public IImage

@@ -44,7 +44,7 @@ struct IImageSource : public IImage
 	/// </summary>
 	/// <param name="imageFormat">The format to return the image in.</param>
 	[[nodiscard]]
-	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const = 0;
+	virtual const unsigned char* GetPixels() const = 0;
 
 	/*
 	/// <summary>
@@ -116,7 +116,7 @@ public:
 	/// </summary>
 	/// <param name="imageFormat">The format to return the image in.</param>
 	[[nodiscard]]
-	virtual const unsigned char* GetPixels(ImageFormat imageFormat) const override {
+	virtual const unsigned char* GetPixels() const override {
 		return _imageData;
 	}
 

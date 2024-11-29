@@ -86,7 +86,9 @@ namespace ImageCaching
 		/// <param name="imagePath">Source path of the image.</param>
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, const TImage* outImage) = 0;
+		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath,
+			const std::shared_ptr<const TImage>& outImage,
+			const ImageSource*& outSourceImage) = 0;
 
 		/// <summary>
 		/// Attempts to get the image identified by the specified path, with the specified width and height in pixels.
@@ -95,14 +97,19 @@ namespace ImageCaching
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>Result of the operation</returns>
 		virtual TryGetImageResult TryGetImageAtSize(const std::filesystem::path& imagePath,
-			unsigned int width, unsigned int height, const TImage*& outImage) = 0;
+			unsigned int width, unsigned int height,
+			const std::shared_ptr<const TImage>& outImage,
+			const ImageSource*& outSourceImage) = 0;
 		
 		/// <summary>
 		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
+		/// If there is already an image in the cache for the image's path, outImage will be the instance that that was in the cache.
 		/// </summary>
 		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryAddImageResult TryAddImage(const TImage* image) = 0;
+		virtual TryAddImageResult TryAddImage(const TImage* image, const TImage*& outImage) = 0;
+
+		virtual TryAddImageResult TryAddSourceImage(const IImageSource* image) = 0;
 
 		/// <summary>
 		/// Tries to remove the provided image from the cache.
@@ -180,6 +187,17 @@ namespace ImageCaching
 			delete SourceImage;
 		}
 
+		ImageCacheItem<TImage>* TryGetResizedImageCacheItem(int width, int height)
+		{
+			const auto resizedImageKey = ResizedImageKey(width, height).ToString();
+			if (auto resizedSearch = ResizedImages.find(resizedImageKey); resizedSearch != ResizedImages.end())
+			{
+				return resizedSearch->second;
+			}
+
+			return nullptr;
+		}
+
 		unsigned int GetTotalSizeInBytes()
 		{
 			unsigned int result = SourceImage->GetSizeInBytes();
@@ -220,6 +238,17 @@ namespace ImageCaching
 			SetMaxMemory(maximumMemoryInBytes);
 		}
 
+		size_t GetCacheEntryCount()
+		{
+			std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
+			return _images.size();
+		}
+
+		int64_t GetCurrentMemoryUsage() const
+		{
+			return _currentMemoryUsage;
+		}
+
 		/// <summary>
 		/// Sets the maximum memory in bytes that the cache is allowed to use. 
 		/// </summary>
@@ -239,7 +268,9 @@ namespace ImageCaching
 		/// <param name="imagePath">Source path of the image.</param>
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>True if the image was in the cache and was retrieved, false otherwise.</returns>
-		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, const TImage* outImage) override;
+		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, 
+			const std::shared_ptr<const TImage>& outImage,
+			const ImageSource*& outSourceImage) override;
 
 		/// <summary>
 		/// Attempts to get the image identified by the specified path, with the specified width and height in pixels.
@@ -249,14 +280,16 @@ namespace ImageCaching
 		/// <returns>True if the image was in the cache and was retrieved, false otherwise.
 		virtual TryGetImageResult TryGetImageAtSize(const std::filesystem::path& imagePath, 
 			unsigned int width, unsigned int height, 
-			const TImage*& outImage) override;
+			const std::shared_ptr<const TImage>& outImage,
+			const ImageSource*& outSourceImage) override;
 
 		/// <summary>
 		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
+		/// If there is already an image in the cache for the image's path, outImage will be the instance that that was in the cache.
 		/// </summary>
 		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryAddImageResult TryAddImage(const TImage* image) override;
+		virtual TryAddImageResult TryAddImage(const TImage* image, const TImage*& outImage) override;
 
 		virtual TryAddImageResult TryAddSourceImage(const IImageSource* image) override;
 
@@ -269,15 +302,15 @@ namespace ImageCaching
 
 	private:
 
+		void OnDestroy(const TImage* image)
+		{
+			TryRemoveImage(image);
+			delete image;
+		}
+
 		// Function to create a shared_ptr with a callback on destruction
 		std::shared_ptr<const TImage> make_shared_with_callback(const TImage* ptr){//, std::function<void()> onDestroy) {
-			return std::shared_ptr<const TImage>(ptr, [onDestroy](const TImage* obj) {
-				TryRemoveImage(obj);
-				delete obj;          // Clean up the object
-				//if (onDestroy) {     // Call the callback
-				//	onDestroy();
-				//}
-			});
+			return std::shared_ptr<const TImage>(ptr, OnDestroy(ptr));
 		}
 
 	};
