@@ -10,7 +10,7 @@
 #define STBI_NO_HDR
 #define STBI_NO_PIC
 #define STBI_NO_PNM  // (.ppm and .pgm)
-#include "stb/stb_image.h"
+#include "../stb/stb_image.h"
 
 
 ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) const

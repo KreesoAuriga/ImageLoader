@@ -123,9 +123,6 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
     {
         std::lock_guard<std::mutex> lockGuard(Mutex);
 
-        //std::shared_ptr<const TImage> loadedImage;
-        //const IImageSource* imageSource = nullptr;
-
         ImageCaching::TryGetImageResult tryGetResult;
         if (Width <= 0 && Height <= 0)
             tryGetResult = ImageCache->TryGetImage(FilePath, LoadedImage, SourceImage);
@@ -150,17 +147,9 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
             {
                 auto imageFileLoader = new ImageDataReader();
                 ImageData* fileData = nullptr;
-                //try
-                //{
-                    fileData = imageFileLoader->ReadFile(FilePath);
-                /*}
-                catch (std::exception ex)
-                {
-                    const auto result = ImageLoadTaskResult<TImage>(ImageLoadStatus::FailedToLoad, LoadedImage, ex.what());
-                    _returnedCallback(result);
-                    _imageLoader->SignalThreadCompleted(this);
-                    return;
-                }*/
+
+                fileData = imageFileLoader->ReadFile(FilePath);
+                
 
                 if (!fileData)
                     throw std::runtime_error("The specified file was not found.");
@@ -206,7 +195,7 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
     }
     catch (std::exception ex)
     {
-            //TODO: zoea 01/12/2024 - actually store the exception on the ImageLoadTaskResult.
+        //TODO: zoea 01/12/2024 - actually store the exception on the ImageLoadTaskResult.
          errorMessage += ex.what();
     }
 
@@ -247,37 +236,10 @@ ImageLoadTaskResult<TImage> ImageLoader<TImage>::LoadImageTask::Resize()
     const auto tryAddResult = ImageCache->TryAddImage(LoadedImage, existingImage);
     if (tryAddResult == ImageCaching::TryAddImageResult::NoChange)
     {
-        throw std::runtime_error("fix this");
-        /*LoadedImage = existingImage;
-        if (existingImage != image)
-        {
-            //image is already in the cache, probably from another thread doing the same work.
-            delete image;//wasn't added to the cache, this is a duplicate.
-        }*/
+        //sanity check - this shouldn't actually happen. Investigate if it does.
+        throw std::runtime_error("Image at size already existed");
     }
 
 
     return ImageLoadTaskResult(ImageLoadStatus::Success, LoadedImage, "");
 }
-
-
-/*
-getSize(source)
-   return TImage* from factory
-
-tryget from cache
-  get lock by path as key
-  open lock
-     redo tryget incase another thread did the work
-
-     if cache doesn't have source item
-       create loader task that resizes
-         places resized in cache and gets the sharedPtr
-       return the task
-
-     if cache has source but not size
-       create task that resizes
-         places resized in cache and get the sharedPtr
-       return the task
-
-*/

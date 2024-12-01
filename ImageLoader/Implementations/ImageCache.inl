@@ -14,8 +14,6 @@ void ImageCache<TImage>::SetMaxMemory(int64_t maximumMemoryInBytes)
 }
 
 
-
-
 template<typename TImage>
 ImageCaching::TryGetImageResult ImageCache<TImage>::TryGetImage(
 	const std::filesystem::path& imagePath,

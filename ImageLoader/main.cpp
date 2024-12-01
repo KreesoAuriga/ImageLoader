@@ -29,7 +29,6 @@ std::mutex _resultsMutex;
 /// </summary>
 std::vector<std::shared_ptr<const TestImage>> _resultImages;
 
-//std::mutex _coutMutex;
 
 ImageCache<TestImage>* _imageCache = nullptr;
 ImageLoader<TestImage>* _imageLoader = nullptr;
@@ -39,54 +38,49 @@ void OnImageLoaded(const ImageLoadTaskResult<UnitTests::TestImage> result)
 	const auto imageSharedPtr = result.GetImage();
 	const TestImage* image = imageSharedPtr.get();
 
-	{
-		//lock against cout to ensure the entire message is output at once, without getting mixed in with other
-		//threads hitting this function concurrently.
-		//std::lock_guard<std::mutex> lock(_coutMutex);
-		const auto status = result.GetStatus();
+	const auto status = result.GetStatus();
 
-		//note that the memory usage and active threads count are for debugging info usage, and are not guaranteed to be correct because
-		//other threads could modify the values before this reports, and because the callback is invoked after the thread ends.
-		std::string imageCacheMemoryUsageMessage = " ImageCache memory usage:" + std::to_string(_imageCache->GetCurrentMemoryUsage());
-		std::string activeThreadsMessage = " active threads:" + std::to_string(_imageLoader->GetRunningThreadsCount());
-		switch (status)
-		{
-		case ImageLoadStatus::Success:
-		{
-			std::string message = std::to_string(status) + " - image acquired:" + image->GetImagePath().string();
-			message += " width:" + std::to_string(image->GetWidth()) + " height:" + std::to_string(image->GetHeight());
-			message += " size in bytes:" + std::to_string(image->GetSizeInBytes());
-			message += "\n";
-			message += imageCacheMemoryUsageMessage + "\n";
-			message += "\n";
-			std::cout << message;
-		}
-			break;
-		case ImageLoadStatus::FailedToLoad:
-		{
-			std::string message = std::to_string(status) + " - image failed to load:";
-			message += result.GetErrorMessage();
-			message += "\n";
-			message += imageCacheMemoryUsageMessage + "\n";
-			message += "\n";
-			std::cout << message;
-		}
-			break;
-		case ImageLoadStatus::OutOfMemory:
-		{
-			++_imageLoadNotEnoughMemory;
-			std::string message = std::to_string(status) + " - image was not loaded because it would exceed the specified limit of memory for loaded images. ";
-			message += "\n";
-			message += result.GetErrorMessage();
-			message += "\n";
-			message += imageCacheMemoryUsageMessage + "\n";
-			message += "\n";
-			std::cout << message;
-		}
-			break;
-		default:
-			break;
-		}
+	//note that the memory usage and active threads count are for debugging info usage, and are not guaranteed to be correct because
+	//other threads could modify the values before this reports, and because the callback is invoked after the thread ends.
+	std::string imageCacheMemoryUsageMessage = " ImageCache memory usage:" + std::to_string(_imageCache->GetCurrentMemoryUsage());
+	std::string activeThreadsMessage = " active threads:" + std::to_string(_imageLoader->GetRunningThreadsCount());
+	switch (status)
+	{
+	case ImageLoadStatus::Success:
+	{
+		std::string message = std::to_string(status) + " - image acquired:" + image->GetImagePath().string();
+		message += " width:" + std::to_string(image->GetWidth()) + " height:" + std::to_string(image->GetHeight());
+		message += " size in bytes:" + std::to_string(image->GetSizeInBytes());
+		message += "\n";
+		message += imageCacheMemoryUsageMessage + "\n";
+		message += "\n";
+		std::cout << message;
+	}
+		break;
+	case ImageLoadStatus::FailedToLoad:
+	{
+		std::string message = std::to_string(status) + " - image failed to load:";
+		message += result.GetErrorMessage();
+		message += "\n";
+		message += imageCacheMemoryUsageMessage + "\n";
+		message += "\n";
+		std::cout << message;
+	}
+		break;
+	case ImageLoadStatus::OutOfMemory:
+	{
+		++_imageLoadNotEnoughMemory;
+		std::string message = std::to_string(status) + " - image was not loaded because it would exceed the specified limit of memory for loaded images. ";
+		message += "\n";
+		message += result.GetErrorMessage();
+		message += "\n";
+		message += imageCacheMemoryUsageMessage + "\n";
+		message += "\n";
+		std::cout << message;
+	}
+		break;
+	default:
+		break;
 	}
 
 	++_imageLoadResultCount;

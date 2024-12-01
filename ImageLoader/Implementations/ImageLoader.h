@@ -25,7 +25,6 @@ private:
 	ImageCaching::IImageCache<TImage>* _imageCache;
 	IImageFactory<TImage>* _imageFactory;
 	int _maxThreadCount = 1;
-	//int _currentThreadCount = 0;
 
 	std::thread* _updateThread = nullptr;
 	bool _updateThreadAbort = false;
@@ -72,8 +71,6 @@ private:
 	private:
 		[[nodiscard]]
 		ImageLoadTaskResult<TImage> Resize();
-
-		//std::shared_ptr<const TImage>* GetImageIfCompleted();
 	};
 
 	std::recursive_mutex _taskQueueMutex;

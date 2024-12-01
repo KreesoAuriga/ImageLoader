@@ -8,20 +8,6 @@
 
 namespace ImageCaching
 {
-	struct ImageId
-	{
-		const std::filesystem::path ImagePath;
-		const int Width;
-		const int Height;
-
-		ImageId(const std::string* imagePath, const int width, const int height)
-			: ImagePath(std::move(ImagePath))
-			, Width(width)
-			, Height(height)
-		{
-		}
-	};
-
 	/// <summary>
 	/// Specifies the result of a try get operation on an implementation of an <see cref="IImageCache" /> interface.
 	/// </summary>
