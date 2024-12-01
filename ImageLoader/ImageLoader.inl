@@ -8,11 +8,16 @@
 #include <type_traits>
 
 
+#ifdef _DEBUG
+//remove before final checkin
+template<typename TImage>
+int ImageLoader<TImage>::_debugTaskStartedCount = 0;
+#endif
 
 template<typename TImage>
 void ImageLoader<TImage>::Update(ImageLoader<TImage>* imageLoader)
 {
-    while (!imageLoader->_abort)
+    while (!imageLoader->_updateThreadAbort)
     {
         std::lock_guard<std::recursive_mutex> taskQueueLock(imageLoader->_taskQueueMutex);
 
@@ -27,8 +32,8 @@ void ImageLoader<TImage>::Update(ImageLoader<TImage>* imageLoader)
                     if (!task->IsStarted)
                     {
                         task->IsStarted = true;
-                        _currentThreadCount++;
-                        std::thread thread(&LoadImageTask::StartLoad, task);
+                        imageLoader->_currentThreadCount++;
+                        std::thread thread(&LoadImageTask::StartAndDelete, task);
                         thread.detach();
                         break;
                     }
@@ -43,10 +48,9 @@ void ImageLoader<TImage>::Update(ImageLoader<TImage>* imageLoader)
 template<typename TImage>
 void ImageLoader<TImage>::SignalThreadCompleted(LoadImageTask* loadImageTask)
 {
-    std::lock_guard<std::recursive_mutex> taskQueueLock(ImageLoader->_taskQueueMutex);
+    std::lock_guard<std::recursive_mutex> taskQueueLock(_taskQueueMutex);
     _taskQueue.erase(loadImageTask->Identifier);
     _currentThreadCount--;
-    delete loadImageTask;
 }
 
 template<typename TImage>
@@ -56,15 +60,15 @@ void ImageLoader<TImage>::SetMaxThreadCount(int count)
 }
 
 template<typename TImage>
-const void ImageLoader<TImage>::TryGetImage(
+const TryGetImageStatus ImageLoader<TImage>::TryGetImage(
     const std::filesystem::path& filePath,
     std::function<void(ImageLoadTaskResult<TImage>)> imageLoadedCallback)
 {    
-    TryGetImage(filePath, 0, 0, imageLoadedCallback);
+    return TryGetImage(filePath, 0, 0, imageLoadedCallback);
 }
 
 template<typename TImage>
-const void ImageLoader<TImage>::TryGetImage(
+const TryGetImageStatus ImageLoader<TImage>::TryGetImage(
     const std::filesystem::path& filePath,
     unsigned int width,
     unsigned int height,
@@ -73,14 +77,18 @@ const void ImageLoader<TImage>::TryGetImage(
     std::lock_guard<std::recursive_mutex> taskQueueLock(_taskQueueMutex);
 
     //don't make a new task for the requested image and size if one is already queued.
-    const auto key = filePath.string();
+    const auto sizeKey = ResizedImageKey(width, height);
+    const auto key = filePath.string() + ":" + sizeKey.ToStringKey();
+
     if (auto task = _taskQueue.find(key); task != _taskQueue.end())
     {
-        return;
+        return TryGetImageStatus::TaskAlreadyExistsAndIsQueued;
     }
 
     auto task = new LoadImageTask(key, filePath, width, height, this, _imageCache, imageLoadedCallback);
     _taskQueue[key] = task;
+
+    return TryGetImageStatus::PlacedNewTaskInQueue;
 }
 
 template<typename TImage>
@@ -92,73 +100,77 @@ void ImageLoader<TImage>::ReleaseImage(const std::filesystem::path& filePath)
 
 
 template<typename TImage>
-void ImageLoader<TImage>::LoadImageTask::StartLoad()
+void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
 {
     bool success = false;
+    ImageLoadTaskResult<TImage> result = ImageLoadTaskResult<TImage>();
     try
     {
         std::lock_guard<std::mutex> lockGuard(Mutex);
 
+        ImageLoader<TImage>::_debugTaskStartedCount++;
         //std::shared_ptr<const TImage> loadedImage;
         //const IImageSource* imageSource = nullptr;
 
         ImageCaching::TryGetImageResult tryGetResult;
         if (Width <= 0 && Height <= 0)
-            tryGetResult = _imageCache->TryGetImage(FilePath, LoadedImage, ImageSource);
+            tryGetResult = ImageCache->TryGetImage(FilePath, LoadedImage, SourceImage);
         else
-            tryGetResult = _imageCache->TryGetImageAtSize(FilePath, Width, Height, LoadedImage, ImageSource);
+            tryGetResult = ImageCache->TryGetImageAtSize(FilePath, Width, Height, LoadedImage, SourceImage);
 
         switch (tryGetResult)
         {
         case ImageCaching::TryGetImageResult::FoundExactMatch:
         {
-            const auto result = ImageLoadTaskResult(ImageLoadStatus::Success, LoadedImage, "");
-            _returnedCallback(result);
-            return;
+            result = ImageLoadTaskResult<TImage>(ImageLoadStatus::Success, LoadedImage, "");
+            break;
         }
 
         case ImageCaching::TryGetImageResult::FoundSourceImageOfDifferentDimensions:
             {
-                Resize();
-                return;
+                result = Resize();
+                break;
             }
 
         case ImageCaching::TryGetImageResult::NotFound:
             {
                 auto imageFileLoader = new ImageDataReader();
-                const ImageData* fileData = nullptr;
+                ImageData* fileData = nullptr;
                 try
                 {
                     fileData = imageFileLoader->ReadFile(FilePath);
                 }
                 catch (std::exception ex)
                 {
-                    const auto result = ImageLoadTaskResult(ImageLoadStatus::FailedToLoad, LoadedImage, ex.what());
+                    const auto result = ImageLoadTaskResult<TImage>(ImageLoadStatus::FailedToLoad, LoadedImage, ex.what());
                     _returnedCallback(result);
                     _imageLoader->SignalThreadCompleted(this);
                     return;
                 }
 
-                const ImageSource* image = new ImageSource(FilePath, fileData->Width, fileData->Height, fileData->Data);
+                SourceImage = new ImageSource(FilePath, fileData->Width, fileData->Height, fileData->Data);
+                Width = fileData->Width;
+                Height = fileData->Height;
                 fileData->Data = nullptr;
                 delete fileData;
                 fileData = nullptr;
 
-                const auto tryAddResult = ImageCache->TryAddImage(image);
+                const auto tryAddResult = ImageCache->TryAddSourceImage(SourceImage);
                 if (tryAddResult == ImageCaching::TryAddImageResult::NoChange)
                 {
                     //image is already in the cache, probably from another thread doing the same work.
-                    delete image;//wasn't added to the cache, this is a duplicate.
+                    delete SourceImage;//wasn't added to the cache, this is a duplicate.
                 }
 
-                Resize();
-                _imageLoader->SignalThreadCompleted(this);
-                return;
+                result = Resize();
+                break;
             }
 
         default:
             throw std::runtime_error("Unknown value for TryGetResult");
         }
+
+        success = true;
 
     }
     catch (...)
@@ -171,38 +183,42 @@ void ImageLoader<TImage>::LoadImageTask::StartLoad()
         catch (...) {} // set_exception() may throw too
     }
 
+    if (!success)
+        result = ImageLoadTaskResult<TImage>(ImageLoadStatus::FailedToLoad, nullptr, "Unexpected error");
+
     _imageLoader->SignalThreadCompleted(this);
+    _returnedCallback(result);
+    delete this;
 }
 
 template<typename TImage>
-void ImageLoader<TImage>::LoadImageTask::Resize()
+ImageLoadTaskResult<TImage> ImageLoader<TImage>::LoadImageTask::Resize()
 {
     if( !SourceImage )//sanity check
         throw std::runtime_error("Resize image failed because SourceImage has not been set.");
 
-    const TImage* image = _imageFactory->ConstructImage(Width, Height, FilePath, SourceImage->GetPixels());
+    const TImage* image = this->_imageLoader->_imageFactory->ConstructImage(Width, Height, FilePath, SourceImage->GetPixels());
     if (!image)
     {
-        const auto result = ImageLoadTaskResult(ImageLoadStatus::FailedToLoad, LoadedImage, "Image factory returned nullptr.");
-        _returnedCallback(result);
-        return;
+        return ImageLoadTaskResult(ImageLoadStatus::FailedToLoad, LoadedImage, "Image factory returned nullptr.");
     }
 
     const TImage* existingImage = nullptr;
-    const auto tryAddResult = ImageCache->TryAddImage(image, existingImage);
+    LoadedImage = ImageCache->MakeSharedPtr(image);
+    const auto tryAddResult = ImageCache->TryAddImage(LoadedImage, existingImage);
     if (tryAddResult == ImageCaching::TryAddImageResult::NoChange)
     {
-        LoadedImage = existingImage;
+        throw std::runtime_error("fix this");
+        /*LoadedImage = existingImage;
         if (existingImage != image)
         {
             //image is already in the cache, probably from another thread doing the same work.
             delete image;//wasn't added to the cache, this is a duplicate.
-        }
+        }*/
     }
 
 
-    const auto result = ImageLoadTaskResult(ImageLoadStatus::Success, LoadedImage, "");
-    _returnedCallback(result);
+    return ImageLoadTaskResult(ImageLoadStatus::Success, LoadedImage, "");
 }
 
 

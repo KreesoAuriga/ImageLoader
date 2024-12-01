@@ -63,7 +63,9 @@ namespace ImageCaching
 		/// <summary>
 		/// The provided image already existed in the cache at the provided key, and so no change was effected.
 		/// </summary>
-		NoChange
+		NoChange,
+
+		OutOfMemory
 	};
 
 	template<typename TImage>
@@ -87,8 +89,8 @@ namespace ImageCaching
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>Result of the operation</returns>
 		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath,
-			const std::shared_ptr<const TImage>& outImage,
-			const ImageSource*& outSourceImage) = 0;
+			std::shared_ptr<const TImage>& outImage,
+			const IImageSource*& outSourceImage) = 0;
 
 		/// <summary>
 		/// Attempts to get the image identified by the specified path, with the specified width and height in pixels.
@@ -98,16 +100,18 @@ namespace ImageCaching
 		/// <returns>Result of the operation</returns>
 		virtual TryGetImageResult TryGetImageAtSize(const std::filesystem::path& imagePath,
 			unsigned int width, unsigned int height,
-			const std::shared_ptr<const TImage>& outImage,
-			const ImageSource*& outSourceImage) = 0;
+			std::shared_ptr<const TImage>& outImage,
+			const IImageSource*& outSourceImage) = 0;
 		
+		virtual std::shared_ptr<const TImage> MakeSharedPtr(const TImage* image) = 0;
+
 		/// <summary>
 		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
 		/// If there is already an image in the cache for the image's path, outImage will be the instance that that was in the cache.
 		/// </summary>
 		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryAddImageResult TryAddImage(const TImage* image, const TImage*& outImage) = 0;
+		virtual TryAddImageResult TryAddImage(std::shared_ptr<const TImage> image, const TImage*& outImage) = 0;
 
 		virtual TryAddImageResult TryAddSourceImage(const IImageSource* image) = 0;
 
@@ -130,7 +134,7 @@ namespace ImageCaching
 		{
 		}
 
-		std::string ToString()
+		std::string ToStringKey() const
 		{
 			std::string result = std::to_string(Width) + ":" + std::to_string(Height);
 			return result;
@@ -145,12 +149,12 @@ namespace ImageCaching
 
 	public:
 
-		ImageCacheItem(const std::shared_ptr<const IImage>& image)
+		ImageCacheItem(std::weak_ptr<const TImage>& image)
 			: _image(image)
 		{
 		}
 
-		std::shared_ptr<const IImage> GetImage()
+		std::shared_ptr<const TImage> GetImage()
 		{
 			return _image.lock();
 		}
@@ -162,34 +166,31 @@ namespace ImageCaching
 	{
 
 		const std::filesystem::path ImagePath;
-		const ImageSource* SourceImage;
+		const IImageSource* SourceImage;
 		//ImageCacheItem SourceImageItem;
 
 		std::map<const std::string, ImageCacheItem<TImage>*> ResizedImages;
 
-		ImageCacheEntry(const ImageSource* sourceImage)
+		ImageCacheEntry(const IImageSource* sourceImage)
 			: ImagePath(sourceImage->GetImagePath())
-			, SourceImage(ImageCacheItem<TImage>(sourceImage))
+			, SourceImage(sourceImage)
 		{
 			static_assert(std::is_convertible<TImage*, IImage*>::value, "TImage type must inherit from IImage.");
 		}
 
 		~ImageCacheEntry()
 		{
-			if (ResizedImages)
-			{
-				for (auto entry : *ResizedImages)
-					delete entry.second;
+			for (auto entry : ResizedImages)
+				delete entry.second;
 
-				delete ResizedImages;
-			}
+			ResizedImages.clear();
 
 			delete SourceImage;
 		}
 
 		ImageCacheItem<TImage>* TryGetResizedImageCacheItem(int width, int height)
 		{
-			const auto resizedImageKey = ResizedImageKey(width, height).ToString();
+			const auto resizedImageKey = ResizedImageKey(width, height).ToStringKey();
 			if (auto resizedSearch = ResizedImages.find(resizedImageKey); resizedSearch != ResizedImages.end())
 			{
 				return resizedSearch->second;
@@ -269,8 +270,8 @@ namespace ImageCaching
 		/// <param name="outImage">The image instance retrieved from the cache</param>
 		/// <returns>True if the image was in the cache and was retrieved, false otherwise.</returns>
 		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath, 
-			const std::shared_ptr<const TImage>& outImage,
-			const ImageSource*& outSourceImage) override;
+			std::shared_ptr<const TImage>& outImage,
+			const IImageSource*& outSourceImage) override;
 
 		/// <summary>
 		/// Attempts to get the image identified by the specified path, with the specified width and height in pixels.
@@ -280,8 +281,10 @@ namespace ImageCaching
 		/// <returns>True if the image was in the cache and was retrieved, false otherwise.
 		virtual TryGetImageResult TryGetImageAtSize(const std::filesystem::path& imagePath, 
 			unsigned int width, unsigned int height, 
-			const std::shared_ptr<const TImage>& outImage,
-			const ImageSource*& outSourceImage) override;
+			std::shared_ptr<const TImage>& outImage,
+			const IImageSource*& outSourceImage) override;
+
+
 
 		/// <summary>
 		/// Adds the image to the cache, unless the image already exists in the cache at the image's path.
@@ -289,7 +292,7 @@ namespace ImageCaching
 		/// </summary>
 		/// <param name="image">The image to add into the cache.</param>
 		/// <returns>Result of the operation</returns>
-		virtual TryAddImageResult TryAddImage(const TImage* image, const TImage*& outImage) override;
+		virtual TryAddImageResult TryAddImage(std::shared_ptr<const TImage> image, const TImage*& outImage) override;
 
 		virtual TryAddImageResult TryAddSourceImage(const IImageSource* image) override;
 
@@ -310,9 +313,21 @@ namespace ImageCaching
 
 		// Function to create a shared_ptr with a callback on destruction
 		std::shared_ptr<const TImage> make_shared_with_callback(const TImage* ptr){//, std::function<void()> onDestroy) {
-			return std::shared_ptr<const TImage>(ptr, OnDestroy(ptr));
+			ImageCache& cache = *this;
+			return std::shared_ptr<const TImage>(ptr, [&cache](const TImage* image) {
+				// Custom deleter calling OnDestroy
+				cache.OnDestroy(image);
+				//delete image; // Manually delete the raw pointer
+			});
 		}
 
+	public:
+		virtual std::shared_ptr<const TImage> MakeSharedPtr(const TImage* image) override
+		{
+			return make_shared_with_callback(image);
+		}
 	};
 
 }
+
+#include "ImageCache.inl"

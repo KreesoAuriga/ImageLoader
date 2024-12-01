@@ -36,7 +36,7 @@ struct IImageDataReader
 	/// <param name="filePath">The absolute path to the file.</param>
 	/// <returns>Image data with dimensions.</returns>
 	[[nodiscard]]
-	virtual const ImageData* ReadFile(const std::filesystem::path& filePath) const = 0;
+	virtual ImageData* ReadFile(const std::filesystem::path& filePath) const = 0;
 
 };
 
@@ -53,5 +53,7 @@ public:
 	/// <param name="filePath">The absolute path to the file.</param>
 	/// <returns>Image data with dimensions.</returns>
 	[[nodiscard]]
-	virtual const ImageData* ReadFile(const std::filesystem::path& filePath) const override;
+	virtual ImageData* ReadFile(const std::filesystem::path& filePath) const override;
 };
+
+#include "ImageFileLoader.inl"

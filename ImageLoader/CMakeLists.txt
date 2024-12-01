@@ -12,7 +12,7 @@ endif()
 project ("ImageLoader")
 
 # Add source to this project's executable.
-add_executable (ImageLoader "main.cpp" "main.h" "Image.h" "ImageCache.h" "ImageLoader.h" "ImageLoader.cpp" "ImageFileLoader.h" "Image.cpp" "ImageFileLoader.cpp" "UnitTests/AcceptanceTests.h" "UnitTests/ImageFileLoaderTests.h" "UnitTests/UnitTestsSetup.h" "stb/stb_image.h" "stb/stb_image_resize2.h"  "ImageCache.cpp" "UnitTests/ImageCacheTests.h" "ImageFactory.h" "UnitTests/TestImplementations.h")
+add_executable (ImageLoader "main.cpp" "main.h" "Image.h" "ImageCache.h" "ImageLoader.h" "ImageLoader.inl" "ImageFileLoader.h" "Image.cpp" "ImageFileLoader.inl" "UnitTests/AcceptanceTests.h" "UnitTests/ImageFileLoaderTests.h" "UnitTests/UnitTestsSetup.h" "stb/stb_image.h" "stb/stb_image_resize2.h"  "ImageCache.inl" "UnitTests/ImageCacheTests.h" "ImageFactory.h" "UnitTests/TestImplementations.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET ImageLoader PROPERTY CXX_STANDARD 20)

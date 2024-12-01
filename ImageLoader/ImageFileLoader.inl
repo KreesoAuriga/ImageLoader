@@ -15,7 +15,7 @@
 //#define STBI_REALLOC
 #include "stb/stb_image.h"
 
-const ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) const
+ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) const
 {
 	const auto filePathStr = filePath.string();
 

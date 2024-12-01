@@ -15,15 +15,49 @@ enum ImageLoadStatus
 	OutOfMemory
 };
 
+namespace std
+{
+	static std::string to_string(ImageLoadStatus imageLoadStatus)
+	{
+		switch (imageLoadStatus)
+		{
+		case ImageLoadStatus::Success:
+			return "Success";
+
+		case ImageLoadStatus::FailedToLoad:
+			return "FailedToLoad";
+
+		case ImageLoadStatus::OutOfMemory:
+			return "OutOfMemory";
+
+		default:
+			return "OUT OF RANGE VALUE for ImageLoadStatus";
+		}
+	}
+}
+
+enum TryGetImageStatus
+{
+	PlacedNewTaskInQueue,
+	TaskAlreadyExistsAndIsQueued
+};
+
 template<typename TImage>
 class ImageLoadTaskResult 
 {
-	const ImageLoadStatus _status;
-	const std::shared_ptr<const TImage> _imageResult;
-	const std::string _errorMessage;
+	ImageLoadStatus _status;
+	std::shared_ptr<const TImage> _imageResult;
+	std::string _errorMessage;
 
 public:
-	ImageLoadTaskResult(ImageLoadStatus status, const std::shared_ptr<const TImage> imageResult, const std::string errorMessage)
+	ImageLoadTaskResult()
+		: _status(ImageLoadStatus::FailedToLoad)
+		, _imageResult(std::shared_ptr<const TImage>(nullptr))
+		, _errorMessage("")
+	{
+	}
+
+	ImageLoadTaskResult(ImageLoadStatus status, std::shared_ptr<const TImage> imageResult, const std::string errorMessage)
 		: _status(status)
 		, _imageResult(std::move(imageResult))
 		, _errorMessage(std::move(errorMessage))
@@ -63,7 +97,7 @@ struct IImageLoader
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const void TryGetImage(
+	virtual const TryGetImageStatus TryGetImage(
 		const std::filesystem::path& filePath, 
 		std::function<void(const ImageLoadTaskResult<TImage>)> imageLoadedCallback) = 0;
 
@@ -73,7 +107,7 @@ struct IImageLoader
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const void TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height,
+	virtual const TryGetImageStatus TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height,
 		std::function<void(const ImageLoadTaskResult<TImage>)> imageLoadedCallback) = 0;
 
 	/// <summary>
@@ -93,6 +127,12 @@ struct IImageLoader
 template<typename TImage>
 class ImageLoader : public IImageLoader<TImage>
 {
+#ifdef _DEBUG
+public:
+	//remove before final checkin
+	static int _debugTaskStartedCount;
+#endif
+
 public:
 	//[[nodiscard]]
 	//using ImageReturnedCallback = std::function<void(std::shared_ptr<const TImage>())>;
@@ -111,6 +151,8 @@ private:
 
 	class LoadImageTask
 	{
+
+	public:
 		std::string Identifier;
 		std::mutex Mutex;
 		std::condition_variable Condition;
@@ -123,9 +165,8 @@ private:
 		ImageLoader<TImage>* _imageLoader;
 		std::function<void(const ImageLoadTaskResult<TImage>)> _returnedCallback;
 
-		bool IsStarted = false;
 
-	public:
+		bool IsStarted = false;
 
 		LoadImageTask(std::string identifier,
 			std::filesystem::path filePath, int width, int height,
@@ -136,15 +177,17 @@ private:
 			, FilePath(std::move(filePath))
 			, Width(width)
 			, Height(height)
-			, ImageLoader(imageLoader)
+			, _imageLoader(imageLoader)
 			, ImageCache(imageCache)
 			, _returnedCallback(std::move(returnedCallback))
 
 		{
 		}
 
-		void StartLoad();
-		void Resize();
+		void StartAndDelete();
+	private:
+		[[nodiscard]]
+		ImageLoadTaskResult<TImage> Resize();
 
 		//std::shared_ptr<const TImage>* GetImageIfCompleted();
 	};
@@ -205,7 +248,7 @@ public:
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const void TryGetImage(
+	virtual const TryGetImageStatus TryGetImage(
 		const std::filesystem::path& filePath, 		
 		std::function<void(ImageLoadTaskResult<TImage>)> imageLoadedCallback) override;
 
@@ -215,7 +258,7 @@ public:
 	/// <param name="filePath">Path to the image.</param>
 	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
 	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const void TryGetImage(
+	virtual const TryGetImageStatus TryGetImage(
 		const std::filesystem::path& filePath, 
 		unsigned int width,
 		unsigned int height,
@@ -229,3 +272,5 @@ public:
 	virtual void ReleaseImage(const std::filesystem::path& filePath) override;
 
 };
+
+#include "ImageLoader.inl"
