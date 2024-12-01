@@ -57,7 +57,7 @@ void OnImageLoaded(const ImageLoadTaskResult<UnitTests::TestImage> result)
 			std::cout << image->GetImagePath() << " width:" << std::to_string(image->GetWidth());
 			std::cout << " height:" << std::to_string(image->GetHeight()) << " size in bytes:" << std::to_string(image->GetSizeInBytes());
 			std::cout << "\n";
-			std::cout << imageCacheMemoryUsageMessage << activeThreadsMessage << "\n";
+			std::cout << imageCacheMemoryUsageMessage << "\n";
 			std::cout << "\n";
 		}
 			break;
@@ -66,7 +66,7 @@ void OnImageLoaded(const ImageLoadTaskResult<UnitTests::TestImage> result)
 			std::cout << std::to_string(status) << " - image failed to load:";
 			std::cout << result.GetErrorMessage();
 			std::cout << "\n";
-			std::cout << imageCacheMemoryUsageMessage << activeThreadsMessage << "\n";
+			std::cout << imageCacheMemoryUsageMessage << "\n";
 			std::cout << "\n";
 		}
 			break;
@@ -77,7 +77,7 @@ void OnImageLoaded(const ImageLoadTaskResult<UnitTests::TestImage> result)
 			std::cout << "\n";
 			std::cout << result.GetErrorMessage();
 			std::cout << "\n";
-			std::cout << imageCacheMemoryUsageMessage << activeThreadsMessage << "\n";
+			std::cout << imageCacheMemoryUsageMessage << "\n";
 			std::cout << "\n";
 		}
 			break;
@@ -265,8 +265,8 @@ int main()
 
 	{
 		auto start = std::chrono::high_resolution_clock::now();
-		std::cout << "Acceptance test #4, 1 allowed loader thread, allow enough memory for all images. \n";
-		AcceptanceTest(1, false);
+		std::cout << "Acceptance test #4, 2 allowed loader threads, allow enough memory for all images. \n";
+		AcceptanceTest(2, false);
 
 		auto end = std::chrono::high_resolution_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start);

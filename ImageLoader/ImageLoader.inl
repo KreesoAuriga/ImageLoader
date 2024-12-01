@@ -59,6 +59,8 @@ template<typename TImage>
 void ImageLoader<TImage>::SignalThreadCompleted(LoadImageTask* loadImageTask)
 {
     std::lock_guard<std::recursive_mutex> taskQueueLock(_taskQueueMutex);
+    const int threadCount = _runningThreadsCount;
+    std::cout << "Task completed, current threadCount=" << threadCount << "\n";
     _taskQueue.erase(loadImageTask->Identifier);
 
     _runningThreadsCount--;
