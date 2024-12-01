@@ -2,6 +2,7 @@
 #include <future>
 #include <cassert>
 #include <filesystem>
+#include "Assert.h"
 
 /// <summary>
 /// Container for image file data which includes the image dimensions.
@@ -17,9 +18,9 @@ struct ImageData
 		, Height(height)
 		, Data(data)
 	{
-		assert((width >= 1, "Width must be greater than 0"));
-		assert((height >= 1, "Width must be greater than 0"));
-		assert((data, "data cannot be null"));
+		ASSERT_MSG(width >= 1, "Width must be greater than 0");
+		ASSERT_MSG(height >= 1, "Width must be greater than 0");
+		ASSERT_MSG(data, "data cannot be null");
 	}
 
 	~ImageData();
@@ -31,13 +32,14 @@ struct ImageData
 struct IImageDataReader
 {
 	/// <summary>
-	/// Reads the data for an image file from a path.
+	/// Reads the data for an image file from a path. Returns null if the file is not found.
 	/// </summary>
 	/// <param name="filePath">The absolute path to the file.</param>
 	/// <returns>Image data with dimensions.</returns>
 	[[nodiscard]]
 	virtual ImageData* ReadFile(const std::filesystem::path& filePath) const = 0;
 
+	//TODO: zoea 01/12/2024 this should use a TryGet pattern, rather than just have a nullptr returned indicating file not found.
 };
 
 
@@ -48,7 +50,7 @@ class ImageDataReader : public IImageDataReader
 {
 public:
 	/// <summary>
-	/// Reads the data for an image file from a path on
+	/// Reads the data for an image file from a path. Returns null if the file is not found.
 	/// </summary>
 	/// <param name="filePath">The absolute path to the file.</param>
 	/// <returns>Image data with dimensions.</returns>

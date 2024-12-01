@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <iostream>
 
 enum ImageFormat
 {	
@@ -53,7 +54,10 @@ struct IImageSource : public IImage
 	[[nodiscard]]
 	virtual ImageFormat GetNativeImageFormat() const = 0;
 	*/
+
+	virtual ~IImageSource() = 0;
 };
+
 
 struct IImageResized : public IImage
 {
@@ -82,7 +86,7 @@ public:
 	{
 	}
 
-	~ImageSource()
+	~ImageSource() override
 	{
 		free((void*)_imageData);
 	}

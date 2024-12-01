@@ -19,6 +19,9 @@ ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) cons
 {
 	const auto filePathStr = filePath.string();
 
+	if (!std::filesystem::exists(filePathStr))
+		return nullptr;
+
 	//For now, we'll force 4 channels for consistency.
 	//TODO: zoea 25/11/2024 add affordances to allow for handling images without an alpha to not waste space storing an alpha channel.
 	int requiredChannelCount = 4;

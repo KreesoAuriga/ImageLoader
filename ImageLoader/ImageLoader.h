@@ -7,6 +7,7 @@
 #include <future>
 #include <functional>
 #include <cassert>
+#include "Assert.h"
 
 enum ImageLoadStatus
 {
@@ -127,11 +128,6 @@ struct IImageLoader
 template<typename TImage>
 class ImageLoader : public IImageLoader<TImage>
 {
-#ifdef _DEBUG
-public:
-	//remove before final checkin
-	static int _debugTaskStartedCount;
-#endif
 
 public:
 	//[[nodiscard]]
@@ -144,10 +140,13 @@ private:
 	ImageCaching::IImageCache<TImage>* _imageCache;
 	IImageFactory<TImage>* _imageFactory;
 	int _maxThreadCount = 1;
-	int _currentThreadCount = 0;
+	//int _currentThreadCount = 0;
 
 	std::thread* _updateThread = nullptr;
 	bool _updateThreadAbort = false;
+
+
+	std::atomic<int> _runningThreadsCount = 0;
 
 	class LoadImageTask
 	{
@@ -215,7 +214,10 @@ private:
 
 private:
 	static void Update(ImageLoader<TImage>* imageLoader);
+	void SignalThreadStart(LoadImageTask* loadImageTask);
 	void SignalThreadCompleted(LoadImageTask* loadImageTask);
+
+
 
 public:
 	ImageLoader(ImageCaching::IImageCache<TImage>* imageCache, IImageFactory<TImage>* imageFactory, int maxThreadCount)
@@ -224,7 +226,7 @@ public:
 		, _maxThreadCount(maxThreadCount)
 
 	{
-		assert((imageCache, "ImageCache cannot be null"));
+		ASSERT_MSG(imageCache, "ImageCache cannot be null");
 		static_assert(std::is_convertible<TImage*, IImage*>::value, "TImage type must inherit from IImage.");
 
 		_updateThread = new std::thread(Update, this);
@@ -234,6 +236,13 @@ public:
 	~ImageLoader()
 	{
 		_updateThreadAbort = true;
+
+		//the update thread gets lock on the task queue each pass, so we'll use the same mutex to wait for it to exit.
+		std::lock_guard<std::recursive_mutex> taskQueueLock(_taskQueueMutex);
+	}
+
+	int GetRunningThreadsCount() const {
+		return _runningThreadsCount;
 	}
 
 	/// <summary>

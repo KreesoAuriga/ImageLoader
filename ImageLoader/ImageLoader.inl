@@ -8,11 +8,6 @@
 #include <type_traits>
 
 
-#ifdef _DEBUG
-//remove before final checkin
-template<typename TImage>
-int ImageLoader<TImage>::_debugTaskStartedCount = 0;
-#endif
 
 template<typename TImage>
 void ImageLoader<TImage>::Update(ImageLoader<TImage>* imageLoader)
@@ -21,19 +16,23 @@ void ImageLoader<TImage>::Update(ImageLoader<TImage>* imageLoader)
     {
         std::lock_guard<std::recursive_mutex> taskQueueLock(imageLoader->_taskQueueMutex);
 
-        if (imageLoader->_currentThreadCount < imageLoader->_maxThreadCount)
-        {
-            if (!imageLoader->_taskQueue.empty())
+        //This should be thread safe, because we only increment running thread count within the taskqueue mutex.
+        //The thread for a running task could decrement the value after we read it, but the priority is we don't launch
+        //too many threads, not that we launch the exact number of non-running threads.
+        int availableThreadCount = imageLoader->_maxThreadCount - imageLoader->_runningThreadsCount;
+        if (availableThreadCount > 0 && !imageLoader->_taskQueue.empty())
+         {
+            for (int t = 0; t < availableThreadCount; t++)
             {
                 for (const auto& queueItem : imageLoader->_taskQueue)
                 {
-                    //just start one task per pass
                     LoadImageTask* task = queueItem.second;
                     if (!task->IsStarted)
                     {
                         task->IsStarted = true;
-                        imageLoader->_currentThreadCount++;
+
                         std::thread thread(&LoadImageTask::StartAndDelete, task);
+                        imageLoader->SignalThreadStart(task);
                         thread.detach();
                         break;
                     }
@@ -46,11 +45,23 @@ void ImageLoader<TImage>::Update(ImageLoader<TImage>* imageLoader)
 }
 
 template<typename TImage>
+void ImageLoader<TImage>::SignalThreadStart(LoadImageTask* loadImageTask)
+{
+    const auto count = ++_runningThreadsCount;
+    if (count > _maxThreadCount)
+    {
+        const auto msg = "Started a new thread when the max thread count of " + std::to_string(_maxThreadCount) + " had already been reached.";
+        throw std::runtime_error(msg);
+    }
+}
+
+template<typename TImage>
 void ImageLoader<TImage>::SignalThreadCompleted(LoadImageTask* loadImageTask)
 {
     std::lock_guard<std::recursive_mutex> taskQueueLock(_taskQueueMutex);
     _taskQueue.erase(loadImageTask->Identifier);
-    _currentThreadCount--;
+
+    _runningThreadsCount--;
 }
 
 template<typename TImage>
@@ -102,13 +113,14 @@ void ImageLoader<TImage>::ReleaseImage(const std::filesystem::path& filePath)
 template<typename TImage>
 void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
 {
+
     bool success = false;
     ImageLoadTaskResult<TImage> result = ImageLoadTaskResult<TImage>();
+    std::string errorMessage = "";
     try
     {
         std::lock_guard<std::mutex> lockGuard(Mutex);
 
-        ImageLoader<TImage>::_debugTaskStartedCount++;
         //std::shared_ptr<const TImage> loadedImage;
         //const IImageSource* imageSource = nullptr;
 
@@ -136,17 +148,20 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
             {
                 auto imageFileLoader = new ImageDataReader();
                 ImageData* fileData = nullptr;
-                try
-                {
+                //try
+                //{
                     fileData = imageFileLoader->ReadFile(FilePath);
-                }
+                /*}
                 catch (std::exception ex)
                 {
                     const auto result = ImageLoadTaskResult<TImage>(ImageLoadStatus::FailedToLoad, LoadedImage, ex.what());
                     _returnedCallback(result);
                     _imageLoader->SignalThreadCompleted(this);
                     return;
-                }
+                }*/
+
+                if (!fileData)
+                    throw std::runtime_error("The specified file was not found.");
 
                 SourceImage = new ImageSource(FilePath, fileData->Width, fileData->Height, fileData->Data);
                 Width = fileData->Width;
@@ -156,13 +171,29 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
                 fileData = nullptr;
 
                 const auto tryAddResult = ImageCache->TryAddSourceImage(SourceImage);
-                if (tryAddResult == ImageCaching::TryAddImageResult::NoChange)
+                switch (tryAddResult)
                 {
-                    //image is already in the cache, probably from another thread doing the same work.
-                    delete SourceImage;//wasn't added to the cache, this is a duplicate.
-                }
+                    case ImageCaching::TryAddImageResult::Added:
+                        result = Resize();
+                        success = true;
+                        break;
 
-                result = Resize();
+                    case ImageCaching::TryAddImageResult::AddedAsResizedImage:
+                        //note: shoud never happen because addsource never returns this value.
+                        break;
+
+                    case ImageCaching::TryAddImageResult::NoChange:
+                        //image is already in the cache, probably from another thread doing the same work.
+                        delete SourceImage;//wasn't added to the cache, this is a duplicate.
+                        break;
+
+                    case ImageCaching::TryAddImageResult::OutOfMemory:
+                        errorMessage += "ImageCache is out of memory. ";
+                        break;
+
+                    default:
+                        throw std::runtime_error("Unknown value for ImageCaching::TryAddImageResult");
+                }
                 break;
             }
 
@@ -170,21 +201,18 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
             throw std::runtime_error("Unknown value for TryGetResult");
         }
 
-        success = true;
-
     }
-    catch (...)
+    catch (std::exception ex)
     {
-        try
-        {
-            // store anything thrown in the promise
-            //imagePromise.set_exception(std::current_exception());
-        }
-        catch (...) {} // set_exception() may throw too
+            //TODO: zoea 01/12/2024 - actually store the exception on the ImageLoadTaskResult.
+         errorMessage += ex.what();
     }
 
     if (!success)
-        result = ImageLoadTaskResult<TImage>(ImageLoadStatus::FailedToLoad, nullptr, "Unexpected error");
+    {
+        errorMessage = FilePath.string() + " " + errorMessage;
+        result = ImageLoadTaskResult<TImage>(ImageLoadStatus::FailedToLoad, nullptr, errorMessage);
+    }
 
     _imageLoader->SignalThreadCompleted(this);
     _returnedCallback(result);
@@ -197,7 +225,16 @@ ImageLoadTaskResult<TImage> ImageLoader<TImage>::LoadImageTask::Resize()
     if( !SourceImage )//sanity check
         throw std::runtime_error("Resize image failed because SourceImage has not been set.");
 
-    const TImage* image = this->_imageLoader->_imageFactory->ConstructImage(Width, Height, FilePath, SourceImage->GetPixels());
+
+    //For sake of testing, resize will just be implemented as truncating the byte stream to the matching size.
+    //Visually this result is incorrect, but this test code has no affordance to display the images anyway.
+    int resizedLength = Width * Height * 4;//rgba 8bits per color
+    auto* pixelDataAtSize = new unsigned char[resizedLength];
+
+    const auto* sourceData = SourceImage->GetPixels();
+    memcpy(pixelDataAtSize, sourceData, resizedLength);
+
+    const TImage* image = this->_imageLoader->_imageFactory->ConstructImage(Width, Height, FilePath, pixelDataAtSize);
     if (!image)
     {
         return ImageLoadTaskResult(ImageLoadStatus::FailedToLoad, LoadedImage, "Image factory returned nullptr.");

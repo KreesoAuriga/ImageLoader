@@ -199,19 +199,6 @@ TryAddImageResult ImageCache<TImage>::TryAddImage(std::shared_ptr<const TImage> 
 
 	throw std::runtime_error("Cannot add image without first adding its imageSource");
 	return TryAddImageResult::NoChange;
-	/*
-	const auto imageSize = image->GetSizeInBytes();
-	if (_currentMemoryUsage + imageSize > _maxAllowedMemory)
-	{
-		return TryAddImageResult::OutOfMemory;
-	}
-
-	_images[key] = new ImageCacheEntry<TImage>(image);
-	_currentMemoryUsage += image->GetSizeInBytes();
-
-	CheckMemoryUsage();
-	return TryAddImageResult::Added;
-	*/
 }
 
 template<typename TImage>

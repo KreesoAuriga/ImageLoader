@@ -2,6 +2,7 @@
 #include "UnitTestsSetup.h"
 #include "../ImageFileLoader.h"
 #include <iostream>
+#include "assert.h"
 
 namespace UnitTests
 {
@@ -26,9 +27,10 @@ namespace UnitTests
 
 			const ImageData* loadedFile = loader->ReadFile(path);
 
-			assert(loadedFile->Width == expectedWidth);
-			assert(loadedFile->Height == expectedHeight);
-			assert(loadedFile->Data != nullptr);
+			ASSERT(loadedFile);
+			ASSERT(loadedFile->Width == expectedWidth);
+			ASSERT(loadedFile->Height == expectedHeight);
+			ASSERT(loadedFile->Data != nullptr);
 
 
 			outMessage = "test: LoadFile " + fileName + " passed";
