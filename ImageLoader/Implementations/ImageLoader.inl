@@ -1,12 +1,12 @@
 #include "ImageLoader.h"
 #include "Image.h"
-#include "ImageFileLoader.h"
+#include "ImageDataReader.h"
+#include "ImageSource.h"
 #include <cassert>
 #include <future>
 #include <thread>
 #include <iostream>
 #include <type_traits>
-
 
 
 template<typename TImage>

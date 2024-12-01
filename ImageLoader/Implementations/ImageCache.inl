@@ -14,41 +14,15 @@ void ImageCache<TImage>::SetMaxMemory(int64_t maximumMemoryInBytes)
 }
 
 
-template<typename TImage>
-void ImageCache<TImage>::CheckMemoryUsage()
-{
-	/*while (_currentMemoryUsage > _maxAllowedMemory)
-	{
-		std::time_t earliestAccessTime = std::numeric_limits<time_t>::max();
-		ImageCacheEntry* earliestCacheEntry = nullptr;
 
-		for (auto entry : _images)
-		{
-			const auto entryTime = entry.second->SourceImage.GetLastAccessedTime();
-			if (entryTime < earliestAccessTime)
-			{
-				earliestAccessTime = entryTime;
-				earliestCacheEntry = entry.second;
-			}
-		}
-
-		if (!earliestCacheEntry)
-			break;
-
-		const auto sizeOfEarliestItem = earliestCacheEntry->GetTotalSizeInBytes();
-		_currentMemoryUsage -= sizeOfEarliestItem;
-
-		_images.erase(earliestCacheEntry->ImagePath.string());
-		delete earliestCacheEntry;
-	}*/
-}
 
 template<typename TImage>
-TryGetImageResult ImageCache<TImage>::TryGetImage(
+ImageCaching::TryGetImageResult ImageCache<TImage>::TryGetImage(
 	const std::filesystem::path& imagePath,
 	std::shared_ptr<const TImage>& outImage,
 	const IImageSource*& outSourceImage)
 {
+	using namespace ImageCaching;
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 
 	const auto key = imagePath.string();
@@ -72,13 +46,14 @@ TryGetImageResult ImageCache<TImage>::TryGetImage(
 }
 
 template<typename TImage>
-TryGetImageResult ImageCache<TImage>::TryGetImageAtSize(
+ImageCaching::TryGetImageResult ImageCache<TImage>::TryGetImageAtSize(
 	const std::filesystem::path& imagePath,
 	unsigned int width, 
 	unsigned int height,
 	std::shared_ptr<const TImage>& outImage,
 	const IImageSource*& outSourceImage)
 {
+	using namespace ImageCaching;
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 
 	//Check if the image is in the cache at it's source size
@@ -103,8 +78,10 @@ TryGetImageResult ImageCache<TImage>::TryGetImageAtSize(
 }
 
 template<typename TImage>
-TryAddImageResult ImageCache<TImage>::TryAddSourceImage(const IImageSource* image)
+ImageCaching::TryAddImageResult ImageCache<TImage>::TryAddSourceImage(const IImageSource* image)
 {
+	using namespace ImageCaching;
+
 	if (!image)
 		return TryAddImageResult::NoChange;
 
@@ -133,32 +110,21 @@ TryAddImageResult ImageCache<TImage>::TryAddSourceImage(const IImageSource* imag
 }
 
 template<typename TImage>
-TryAddImageResult ImageCache<TImage>::TryAddImage(std::shared_ptr<const TImage> image, const TImage*& outImage)
+ImageCaching::TryAddImageResult ImageCache<TImage>::TryAddImage(std::shared_ptr<const TImage> image, const TImage*& outImage)
 {
+	using namespace ImageCaching;
 	
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 
 	outImage = nullptr;
 	const auto key = image->GetImagePath().string();
 
-	//std::shared_ptr<const IImage> sharedPtr = make_shared_with_callback(image);
 
 	if (auto search = _images.find(key); search != _images.end())
 	{
 		ImageCacheEntry<TImage>* cacheEntry = search->second;
 		const IImageSource* sourceImage = cacheEntry->SourceImage;
 
-		//const auto* sourceImage = sourceImage.Image;
-
-		//if (image == sourceImage) //is the exact same instance.
-		//	return TryAddImageResult::NoChange;
-		/*
-		if (image->GetWidth() == sourceImage->GetWidth() &&
-			image->GetHeight() == sourceImage->GetHeight())
-		{
-			//not a different size than source.
-			return TryAddImageResult::NoChange;
-		}*/
 
 		const auto resizedImageKey = ResizedImageKey(image->GetWidth(), image->GetHeight()).ToStringKey();
 
@@ -193,7 +159,7 @@ TryAddImageResult ImageCache<TImage>::TryAddImage(std::shared_ptr<const TImage> 
 		std::weak_ptr<const TImage> weakPtr = image;
 		cacheEntry->ResizedImages[resizedImageKey] = new ImageCacheItem<TImage>(weakPtr);
 		_currentMemoryUsage += image->GetSizeInBytes();
-		CheckMemoryUsage();
+
 		return TryAddImageResult::AddedAsResizedImage;
 	}
 
@@ -202,7 +168,7 @@ TryAddImageResult ImageCache<TImage>::TryAddImage(std::shared_ptr<const TImage> 
 }
 
 template<typename TImage>
-bool ImageCaching::ImageCache<TImage>::TryRemoveImage(const TImage* image)
+bool ImageCache<TImage>::TryRemoveImage(const TImage* image)
 {
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 	const auto key = image->GetImagePath().string();

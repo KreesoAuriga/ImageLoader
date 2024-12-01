@@ -1,4 +1,5 @@
 #pragma once
+#include "../ImageFactory.h"
 
 namespace UnitTests
 {

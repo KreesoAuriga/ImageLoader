@@ -1,3 +1,4 @@
+#pragma once
 #include "Image.h"
 
 template<typename TImage>

@@ -1,4 +1,4 @@
-#include "ImageFileLoader.h"
+#include "ImageDataReader.h"
 
 //per documentation from stb, these defines and include should only occur in a single file
 #define STB_IMAGE_IMPLEMENTATION
@@ -10,10 +10,8 @@
 #define STBI_NO_HDR
 #define STBI_NO_PIC
 #define STBI_NO_PNM  // (.ppm and .pgm)
-//#define STBI_FREE
-//#define STBI_MALLOC
-//#define STBI_REALLOC
 #include "stb/stb_image.h"
+
 
 ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) const
 {

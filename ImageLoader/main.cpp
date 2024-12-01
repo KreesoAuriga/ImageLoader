@@ -1,11 +1,11 @@
 ﻿// ImageLoader.cpp : Defines the entry point for the application.
 //
 
-#include "ImageLoader.h"
+#include "Implementations/ImageLoader.h"
 #include <iostream>
 #include <filesystem>
 
-#include "UnitTests/ImageFileLoaderTests.h"
+#include "UnitTests/ImageDataReaderTests.h"
 #include "UnitTests/TestImplementations.h"
 #include "Assert.h"
 
@@ -29,7 +29,7 @@ std::mutex _resultsMutex;
 /// </summary>
 std::vector<std::shared_ptr<const TestImage>> _resultImages;
 
-std::mutex _coutMutex;
+//std::mutex _coutMutex;
 
 ImageCache<TestImage>* _imageCache = nullptr;
 ImageLoader<TestImage>* _imageLoader = nullptr;
@@ -42,7 +42,7 @@ void OnImageLoaded(const ImageLoadTaskResult<UnitTests::TestImage> result)
 	{
 		//lock against cout to ensure the entire message is output at once, without getting mixed in with other
 		//threads hitting this function concurrently.
-		std::lock_guard<std::mutex> lock(_coutMutex);
+		//std::lock_guard<std::mutex> lock(_coutMutex);
 		const auto status = result.GetStatus();
 
 		//note that the memory usage and active threads count are for debugging info usage, and are not guaranteed to be correct because
@@ -53,32 +53,35 @@ void OnImageLoaded(const ImageLoadTaskResult<UnitTests::TestImage> result)
 		{
 		case ImageLoadStatus::Success:
 		{
-			std::cout << std::to_string(status) << " - image acquired:";
-			std::cout << image->GetImagePath() << " width:" << std::to_string(image->GetWidth());
-			std::cout << " height:" << std::to_string(image->GetHeight()) << " size in bytes:" << std::to_string(image->GetSizeInBytes());
-			std::cout << "\n";
-			std::cout << imageCacheMemoryUsageMessage << "\n";
-			std::cout << "\n";
+			std::string message = std::to_string(status) + " - image acquired:" + image->GetImagePath().string();
+			message += " width:" + std::to_string(image->GetWidth()) + " height:" + std::to_string(image->GetHeight());
+			message += " size in bytes:" + std::to_string(image->GetSizeInBytes());
+			message += "\n";
+			message += imageCacheMemoryUsageMessage + "\n";
+			message += "\n";
+			std::cout << message;
 		}
 			break;
 		case ImageLoadStatus::FailedToLoad:
 		{
-			std::cout << std::to_string(status) << " - image failed to load:";
-			std::cout << result.GetErrorMessage();
-			std::cout << "\n";
-			std::cout << imageCacheMemoryUsageMessage << "\n";
-			std::cout << "\n";
+			std::string message = std::to_string(status) + " - image failed to load:";
+			message += result.GetErrorMessage();
+			message += "\n";
+			message += imageCacheMemoryUsageMessage + "\n";
+			message += "\n";
+			std::cout << message;
 		}
 			break;
 		case ImageLoadStatus::OutOfMemory:
 		{
 			++_imageLoadNotEnoughMemory;
-			std::cout << std::to_string(status) << " - image was not loaded because it would exceed the specified limit of memory for loaded images. ";
-			std::cout << "\n";
-			std::cout << result.GetErrorMessage();
-			std::cout << "\n";
-			std::cout << imageCacheMemoryUsageMessage << "\n";
-			std::cout << "\n";
+			std::string message = std::to_string(status) + " - image was not loaded because it would exceed the specified limit of memory for loaded images. ";
+			message += "\n";
+			message += result.GetErrorMessage();
+			message += "\n";
+			message += imageCacheMemoryUsageMessage + "\n";
+			message += "\n";
+			std::cout << message;
 		}
 			break;
 		default:
@@ -152,7 +155,7 @@ void AcceptanceTest(int maxThreadCount, bool testNotEnoughMemory)
 	_expectedImageLoadResultCount = 36;//plus one nonexistent file 
 
 	auto imageFactory = new UnitTests::ImageFactory();
-	_imageCache = new ImageCaching::ImageCache<TestImage>(maxMemory);
+	_imageCache = new ImageCache<TestImage>(maxMemory);
 	_imageLoader = new ImageLoader<TestImage>(_imageCache, imageFactory, maxThreadCount);
 
 	for (const auto& fileName : test_filenames)
@@ -215,9 +218,9 @@ int main()
 		UnitTests::UnitTestsSetup::Initialize(_testDataPath);
 		{
 			//file load unit tests
-			auto imageFileLoaderTests = new UnitTests::ImageFileLoaderTests();
+			auto imageDataReaderTests = new UnitTests::ImageDataReaderTests();
 
-			const auto testResultMessages = imageFileLoaderTests->LoadFiles();
+			const auto testResultMessages = imageDataReaderTests->LoadFiles();
 			for (const auto& message : testResultMessages)
 				std::cout << message << "\n";
 		}

@@ -1,6 +1,6 @@
 #pragma once
 #include "UnitTestsSetup.h"
-#include "../ImageFileLoader.h"
+#include "../Implementations/ImageDataReader.h"
 #include <iostream>
 #include "assert.h"
 
@@ -14,7 +14,7 @@ namespace UnitTests
 	};
 
 
-	class ImageFileLoaderTests
+	class ImageDataReaderTests
 	{
 
 	public:

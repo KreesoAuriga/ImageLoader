@@ -42,20 +42,3 @@ struct IImageDataReader
 	//TODO: zoea 01/12/2024 this should use a TryGet pattern, rather than just have a nullptr returned indicating file not found.
 };
 
-
-/// <summary>
-/// Default implementation of the <see cref="IImageFileLoader"/> interface.
-/// </summary>
-class ImageDataReader : public IImageDataReader
-{
-public:
-	/// <summary>
-	/// Reads the data for an image file from a path. Returns null if the file is not found.
-	/// </summary>
-	/// <param name="filePath">The absolute path to the file.</param>
-	/// <returns>Image data with dimensions.</returns>
-	[[nodiscard]]
-	virtual ImageData* ReadFile(const std::filesystem::path& filePath) const override;
-};
-
-#include "ImageFileLoader.inl"
