@@ -1,31 +1,33 @@
-Coding task for a job interview.
+Coding task done for a job interview, the prompt for the task is task.md in the root folder of the repo.
 
 Created in Visual Studio 2022 as a CMake 'project' to allow it to be cross platform.  In Visual Studio 2022, load the 'ImageLoader' folder from the root of the repository. 
 
+Note that function summaries are implemented in the Visual Studio syntax currently, but the code itself is cross platform.
+
 Major functionality declared as abstract classes, serving as interfaces.
-The default implementations of these interfaces are currently defined in the same files as the interfaces. A more completed implementation would move the implementations to different files inside of separate namespaces.
+The default implementations of these interfaces are currently defined in the implementations folder.
 The major functionality is intended for implementations to accept interfaces, allowing for dependency injection and for these types to be agnostic of implementation. This also facilitates unit testing by allowing mock implementations of interfaces in order to test functions without needing to construct fully implemented objects which depend on other objects also being fully implemented.
 
-The main program function currently serves to execute test code, whereas a complete implementation would move this code to a dedicated test project, including ImageLoader as a library.
+The main program function currently serves to execute test code, whereas a complete implementation would move this code to a dedicated test project, using ImageLoader as an included library.
 
 ImageLoader:
 The top level class of the implementation. Caching behaviour is defined by an implementation of the IImageCache interface, provided to the constructor of ImageLoader.
-The TryGetImage function accepts a file path for the image to be loaded and returns an std::future for acquiring the result via an asynchronous execution.
-This function attempts to acquire the image from the ImageCache interface first, and if not acquired proceeds to load the image file.
+The TryGetImage function accepts a file path for the image to be loaded, and a callback function to return the result. This places a task on a queue and returns a status value to indicate if a new task was created or if there was already a task for the request imaged. TryGetImageAtSize allows for specifying an exact width and height version of the image to be returned instead of the size as loaded from disk.
 
-ImageFileLoader:
+This task created by this function attempts to acquire the image from the ImageCache interface first, if image has been loaded but the requested size is not in the cache it creates the resized image and places it in the cache. If the cache has no entry for the source iamage it proceeds to load the image file.
+
+ImageDataReader:
 Loads image data from a file path. This makes use of image loading functionality from stb https://github.com/nothings/stb 
 stb consists of a header file only implementations for loading various image formats, and so the header file has been directly included for simplicity.
 This class returns image data as an unsigned char array, along with the image width and height.
 
-The ImageLoader class constructs an instance of Image, which implements the IImage interface from the ImageData returned by ImageFileLoader.
-The implementation of IImage also defines ImageResized, which serves to represent the resized version of an image with reference to the original image instance before resizing.
-
-Note that while the ImageLoader class defines a TryGetImage function that accepts arguments for getting an image at an explicit width and height this has not yet been implemented. Resizing would be performed using the resizing functionality that is also from stb https://github.com/nothings/stb, the relevant header file is already included in this repository.
+The ImageLoader class uses an implementation of IImageFactory constructs an instance of an implementation defined IImage, constructed from the width, height, and pixel data.
 
 ImageCache:
-This is the most fully implemented class, and supports adding images at both their original source dimensions, as well as at resized dimensions. It also has functionality implemented to get an image at a specific width and height if the image has been placed in the cache. The cache stores images using the filepath as a key, and a container consisting of the original size image as loaded from disk, and another std::map to contain the resized copies of that image.
-It also has implemented an affordance to check the memory usage after adding a new item, and if above the configurable memory limitation, removes the image items least recently accessed until memory consumption is no longer above the threshhold.
+This stores entries for instances of the source image, as well as the instances of the implementation defined IImage at various resolutions. IImage instances are provided as a shared pointer, so that the cache can automatically removed an instance once all references to the shared pointer have been destructed, and once all instances of an image at all sizes are destructed, it can delete the source image and it's entry from the cache.
+The current implementation returns an image load status reporting out of memory if there loading are creating a resized image exceeds the maximum. Because the cache is agnostic of the usage of each instance of an IImage created by the IImageFactory, this approach is used rather than flushing older items from the cache.
 
-A unit test is defined for the ImageFileLoader class, and there are placeholders for unit tests for other classes that have not yet been implemented.
+A unit test is defined for the ImageDataReader class, and there are placeholders for other tests not yet been implemented.
+
+The main program loop currently serves to run the ImageDataReader unit tests, and performs an acceptance test using images from the TestData folder to confirm image loading at different max thread counts, as well as behaviour when the maximum memory size for the cache is exceeded.
 
