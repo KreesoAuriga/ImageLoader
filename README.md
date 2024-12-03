@@ -1,6 +1,8 @@
-Coding task for a job interview.
+Coding task done for a job interview, the prompt for the task is task.md in the root folder of the repo.
 
 Created in Visual Studio 2022 as a CMake 'project' to allow it to be cross platform.  In Visual Studio 2022, load the 'ImageLoader' folder from the root of the repository. 
+
+Note that function summaries are implemented in the Visual Studio syntax currently, but the code itself is cross platform.
 
 Major functionality declared as abstract classes, serving as interfaces.
 The default implementations of these interfaces are currently defined in the implementations folder.
