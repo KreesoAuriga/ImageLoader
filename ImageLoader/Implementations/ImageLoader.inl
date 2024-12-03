@@ -63,17 +63,17 @@ void ImageLoader<TImage>::SignalThreadCompleted(LoadImageTask* loadImageTask)
     std::cout << "Task completed, current threadCount=" << threadCount << "\n";
     _taskQueue.erase(loadImageTask->Identifier);
 
-    _runningThreadsCount--;
+    --_runningThreadsCount;
 }
 
 template<typename TImage>
-void ImageLoader<TImage>::SetMaxThreadCount(int count)
+void ImageLoader<TImage>::SetMaxThreadCount(const int count)
 {
     _maxThreadCount = count;
 }
 
 template<typename TImage>
-const TryGetImageStatus ImageLoader<TImage>::TryGetImage(
+TryGetImageStatus ImageLoader<TImage>::TryGetImage(
     const std::filesystem::path& filePath,
     std::function<void(ImageLoadTaskResult<TImage>)> imageLoadedCallback)
 {    
@@ -81,7 +81,7 @@ const TryGetImageStatus ImageLoader<TImage>::TryGetImage(
 }
 
 template<typename TImage>
-const TryGetImageStatus ImageLoader<TImage>::TryGetImage(
+TryGetImageStatus ImageLoader<TImage>::TryGetImage(
     const std::filesystem::path& filePath,
     unsigned int width,
     unsigned int height,
@@ -118,7 +118,7 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
 
     bool success = false;
     ImageLoadTaskResult<TImage> result = ImageLoadTaskResult<TImage>();
-    std::string errorMessage = "";
+    std::string errorMessage;
     try
     {
         std::lock_guard<std::mutex> lockGuard(Mutex);
@@ -170,7 +170,7 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
                         break;
 
                     case ImageCaching::TryAddImageResult::AddedAsResizedImage:
-                        //note: shoud never happen because addsource never returns this value.
+                        //note: should never happen because addsource never returns this value.
                         break;
 
                     case ImageCaching::TryAddImageResult::NoChange:
@@ -193,7 +193,7 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
         }
 
     }
-    catch (std::exception ex)
+    catch (std::exception &ex)
     {
         //TODO: zoea 01/12/2024 - actually store the exception on the ImageLoadTaskResult.
          errorMessage += ex.what();
@@ -205,8 +205,8 @@ void ImageLoader<TImage>::LoadImageTask::StartAndDelete()
         result = ImageLoadTaskResult<TImage>(ImageLoadStatus::FailedToLoad, nullptr, errorMessage);
     }
 
-    _imageLoader->SignalThreadCompleted(this);
-    _returnedCallback(result);
+    Loader->SignalThreadCompleted(this);
+    ReturnedCallback(result);
     delete this;
 }
 
@@ -225,7 +225,7 @@ ImageLoadTaskResult<TImage> ImageLoader<TImage>::LoadImageTask::Resize()
     const auto* sourceData = SourceImage->GetPixels();
     memcpy(pixelDataAtSize, sourceData, resizedLength);
 
-    const TImage* image = this->_imageLoader->_imageFactory->ConstructImage(Width, Height, FilePath, pixelDataAtSize);
+    const TImage* image = this->Loader->_imageFactory->ConstructImage(Width, Height, FilePath, pixelDataAtSize);
     if (!image)
     {
         return ImageLoadTaskResult(ImageLoadStatus::FailedToLoad, LoadedImage, "Image factory returned nullptr.");

@@ -13,7 +13,7 @@ struct ImageData
 	const int Height;
 	const unsigned char* Data;
 
-	ImageData(int width, int height, const unsigned char* data)
+	ImageData(const int width, const int height, const unsigned char* data)
 		: Width(width)
 		, Height(height)
 		, Data(data)
@@ -31,6 +31,10 @@ struct ImageData
 /// </summary>
 struct IImageDataReader
 {
+protected:
+	~IImageDataReader() = default;
+
+public:
 	/// <summary>
 	/// Reads the data for an image file from a path. Returns null if the file is not found.
 	/// </summary>

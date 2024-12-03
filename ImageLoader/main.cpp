@@ -95,7 +95,7 @@ void OnImageLoaded(const ImageLoadTaskResult<UnitTests::TestImage> result)
 
 
 
-void AcceptanceTest(int maxThreadCount, bool testNotEnoughMemory)
+void AcceptanceTest(const int maxThreadCount, const bool testNotEnoughMemory)
 {
 
 	_resultImages.clear();

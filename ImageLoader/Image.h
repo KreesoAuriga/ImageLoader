@@ -5,6 +5,9 @@
 
 struct IImage
 {
+protected:
+	~IImage() = default;
+
 public:
 	/// <summary>
 	/// Gets the width in pixels of this image.
@@ -34,14 +37,15 @@ public:
 
 struct IImageSource : public IImage
 {
+public:
+	virtual ~IImageSource() = 0;
+
 	/// <summary>
 	/// Gets the image data pixels, as raw image data
 	/// </summary>
-	/// <param name="imageFormat">The format to return the image in.</param>
 	[[nodiscard]]
 	virtual const unsigned char* GetPixels() const = 0;
 
-	virtual ~IImageSource() = 0;
 };
 
 

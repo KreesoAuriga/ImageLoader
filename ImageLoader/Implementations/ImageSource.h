@@ -11,7 +11,7 @@ protected:
 	const std::filesystem::path _sourcePath;
 
 public:
-	ImageSource(const std::filesystem::path& sourcePath, int width, int height, const unsigned char* imageData)
+	ImageSource(const std::filesystem::path& sourcePath, const int width, const int height, const unsigned char* imageData)
 		: _sourcePath(sourcePath)
 		, _width(width)
 		, _height(height)
@@ -43,7 +43,6 @@ public:
 	/// <summary>
 	/// Gets the image data pixels, as raw image data
 	/// </summary>
-	/// <param name="imageFormat">The format to return the image in.</param>
 	[[nodiscard]]
 	virtual const unsigned char* GetPixels() const override {
 		return _imageData;
@@ -70,4 +69,4 @@ public:
 };
 
 
-IImageSource::~IImageSource() {}
+inline IImageSource::~IImageSource() = default;

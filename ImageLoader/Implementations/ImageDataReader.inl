@@ -13,7 +13,7 @@
 #include "../stb/stb_image.h"
 
 
-ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) const
+inline ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) const
 {
 	const auto filePathStr = filePath.string();
 
@@ -30,7 +30,7 @@ ImageData* ImageDataReader::ReadFile(const std::filesystem::path& filePath) cons
 	return result;
 }
 
-ImageData::~ImageData()
+inline ImageData::~ImageData()
 {
 	if(Data)
 		free((void*)Data);

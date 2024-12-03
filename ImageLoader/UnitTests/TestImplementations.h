@@ -60,7 +60,7 @@ namespace UnitTests
 		}
 	};
 
-	class ImageFactory : public IImageFactory<TestImage>
+	class ImageFactory final : public IImageFactory<TestImage>
 	{
 		/// <summary>
 		/// Constructs a TestImage from raw 8 bit rgba image data. 
@@ -70,7 +70,7 @@ namespace UnitTests
 		/// <param name="rgbaData">Pointer to the raw image data.</param>
 		/// <returns>New instance of the image type.</returns>
 		[[nodiscard]]
-		virtual const TestImage* ConstructImage(const int width, const int height, const std::filesystem::path& path, const unsigned char* rgbaData)
+		virtual const TestImage* ConstructImage(const int width, const int height, const std::filesystem::path& path, const unsigned char* rgbaData) override
 		{
 			return new TestImage(width, height, path, rgbaData);
 		}

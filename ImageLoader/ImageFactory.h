@@ -4,6 +4,10 @@
 template<typename TImage>
 struct IImageFactory
 {
+protected:
+	~IImageFactory() = default;
+
+public:
 	/// <summary>
 	/// Constructs an image of type TImage from raw 8 bit rgba image data. 
 	/// </summary>

@@ -1,14 +1,16 @@
 #pragma once
-#include "../ImageLoader.h"
+#include <cassert>
+#include <functional>
+#include <future>
+#include <mutex>
 #include <string>
-#include "Image.h"
+#include <utility>
+
+#include "../Assert.h"
+#include "../Image.h"
 #include "ImageCache.h"
 #include "../ImageFactory.h"
-#include <mutex>
-#include <future>
-#include <functional>
-#include <cassert>
-#include "Assert.h"
+#include "../ImageLoader.h"
 
 
 /// <summary>
@@ -16,7 +18,7 @@
 /// re-load data from the file path where possible.
 /// </summary>
 template<typename TImage>
-class ImageLoader : public IImageLoader<TImage>
+class ImageLoader final : public IImageLoader<TImage>
 {
 
 private:
@@ -45,25 +47,24 @@ private:
 		const IImageSource* SourceImage = nullptr;
 		std::shared_ptr<const TImage> LoadedImage;
 		ImageCaching::IImageCache<TImage>* ImageCache;
-		ImageLoader<TImage>* _imageLoader;
-		std::function<void(const ImageLoadTaskResult<TImage>)> _returnedCallback;
+		ImageLoader<TImage>* Loader;
+		std::function<void(const ImageLoadTaskResult<TImage>)> ReturnedCallback;
 
 
 		bool IsStarted = false;
 
 		LoadImageTask(std::string identifier,
-			std::filesystem::path filePath, int width, int height,
+			std::filesystem::path filePath, const int width, const int height,
 			ImageLoader<TImage>* imageLoader,
 			ImageCaching::IImageCache<TImage>* imageCache,
 			std::function<void(const ImageLoadTaskResult<TImage>)> returnedCallback)
-			: Identifier(identifier)
+			: Identifier(std::move(identifier))
 			, FilePath(std::move(filePath))
 			, Width(width)
 			, Height(height)
-			, _imageLoader(imageLoader)
 			, ImageCache(imageCache)
-			, _returnedCallback(std::move(returnedCallback))
-
+			, Loader(imageLoader)
+			, ReturnedCallback(std::move(returnedCallback))
 		{
 		}
 
@@ -81,7 +82,7 @@ private:
 
 	std::recursive_mutex* GetImageLock(const std::filesystem::path& filePath)
 	{
-		std::lock_guard(_imageLocksMutex) lock;
+		std::lock_guard lock(_imageLocksMutex);
 
 		const auto key = filePath.string();
 		if (auto search = _imageLocks.find(key); search != _imageLocks.end())
@@ -102,14 +103,14 @@ private:
 
 
 public:
-	ImageLoader(ImageCaching::IImageCache<TImage>* imageCache, IImageFactory<TImage>* imageFactory, int maxThreadCount)
+	ImageLoader(ImageCaching::IImageCache<TImage>* imageCache, IImageFactory<TImage>* imageFactory, const int maxThreadCount)
 		: _imageCache(imageCache)
 		, _imageFactory(imageFactory)
 		, _maxThreadCount(maxThreadCount)
 
 	{
 		ASSERT_MSG(imageCache, "ImageCache cannot be null");
-		static_assert(std::is_convertible<TImage*, IImage*>::value, "TImage type must inherit from IImage.");
+		static_assert(std::is_convertible_v<TImage*, IImage*>, "TImage type must inherit from IImage.");
 
 		_updateThread = new std::thread(Update, this);
 		_updateThread->detach();
@@ -137,9 +138,9 @@ public:
 	/// Attempts to get the image at the specified path. Returns false if the image could not be obtained.
 	/// </summary>
 	/// <param name="filePath">Path to the image.</param>
-	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
-	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const TryGetImageStatus TryGetImage(
+	/// <param name="imageLoadedCallback">Callback that will be invoked completion, returning an ImageLoadTaskResult.</param>
+	/// <returns>Status of the operation.</returns>
+	virtual TryGetImageStatus TryGetImage(
 		const std::filesystem::path& filePath,
 		std::function<void(ImageLoadTaskResult<TImage>)> imageLoadedCallback) override;
 
@@ -147,9 +148,11 @@ public:
 	/// Attempts to get the image at the specified path, and at the specified size. Returns false if the image could not be obtained.
 	/// </summary>
 	/// <param name="filePath">Path to the image.</param>
-	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
-	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const TryGetImageStatus TryGetImage(
+	/// <param name="width">The width in pixels of the image to be retrieved.</returns>
+	/// <param name="height">The height in pixels of the image to be retrieved.</returns>
+	/// <param name="imageLoadedCallback">Callback that will be invoked completion, returning an ImageLoadTaskResult.</param>
+	/// <returns>Status of the operation.</returns>
+	virtual TryGetImageStatus TryGetImage(
 		const std::filesystem::path& filePath,
 		unsigned int width,
 		unsigned int height,

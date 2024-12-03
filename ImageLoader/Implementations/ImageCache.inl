@@ -4,7 +4,7 @@ using namespace ImageCaching;
 
 
 template<typename TImage>
-void ImageCache<TImage>::SetMaxMemory(int64_t maximumMemoryInBytes)
+void ImageCache<TImage>::SetMaxMemory(const int64_t maximumMemoryInBytes)
 {
 	if (maximumMemoryInBytes < 0)
 		throw std::runtime_error("Max memory must be positive");
@@ -54,7 +54,7 @@ ImageCaching::TryGetImageResult ImageCache<TImage>::TryGetImageAtSize(
 	using namespace ImageCaching;
 	std::lock_guard<std::recursive_mutex> lockGuard(_cacheLock);
 
-	//Check if the image is in the cache at it's source size
+	//Check if the image is in the cache at its source size
 	const auto key = imagePath.string();
 	if (auto search = _images.find(key); search != _images.end())
 	{
@@ -102,7 +102,7 @@ ImageCaching::TryAddImageResult ImageCache<TImage>::TryAddSourceImage(const IIma
 	}
 
 	_currentMemoryUsage += imageSize;
-	auto* entry = new ImageCacheEntry<TImage>(image);;
+	auto* entry = new ImageCacheEntry<TImage>(image);
 	_images[key] = entry;
 	return TryAddImageResult::Added;
 }

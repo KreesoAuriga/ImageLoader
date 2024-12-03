@@ -1,13 +1,13 @@
 #pragma once
+#include <cassert>
+#include <functional>
+#include <future>
+#include <mutex>
 #include <string>
+#include "Assert.h"
 #include "Image.h"
 #include "ImageCache.h"
 #include "ImageFactory.h"
-#include <mutex>
-#include <future>
-#include <functional>
-#include <cassert>
-#include "Assert.h"
 
 enum ImageLoadStatus
 {
@@ -18,7 +18,7 @@ enum ImageLoadStatus
 
 namespace std
 {
-	static std::string to_string(ImageLoadStatus imageLoadStatus)
+	static std::string to_string(const ImageLoadStatus imageLoadStatus)
 	{
 		switch (imageLoadStatus)
 		{
@@ -54,27 +54,34 @@ public:
 	ImageLoadTaskResult()
 		: _status(ImageLoadStatus::FailedToLoad)
 		, _imageResult(std::shared_ptr<const TImage>(nullptr))
-		, _errorMessage("")
 	{
 	}
 
-	ImageLoadTaskResult(ImageLoadStatus status, std::shared_ptr<const TImage> imageResult, const std::string errorMessage)
+	ImageLoadTaskResult(const ImageLoadStatus status, std::shared_ptr<const TImage> imageResult, const std::string errorMessage)
 		: _status(status)
 		, _imageResult(std::move(imageResult))
 		, _errorMessage(std::move(errorMessage))
 	{
 	}
 
-	[[nodiscard]]
+	/// <summary>
+	/// Gets the status of the completed operation.
+	/// </summary>
 	ImageLoadStatus GetStatus() const {
 		return _status;
 	}
 
+	/// <summary>
+	/// Gets the image loaded by the task.
+	/// </summary>
 	[[nodiscard]]
 	std::shared_ptr<const TImage> GetImage() const {
 		return _imageResult;
 	}
 
+	/// <summary>
+	/// Gets the error message, or an empty string if not applicable.
+	/// </summary>
 	[[nodiscard]]
 	std::string GetErrorMessage() const
 	{
@@ -86,6 +93,10 @@ public:
 template<typename TImage>
 struct IImageLoader
 {
+protected:
+	~IImageLoader() = default;
+
+public:
 	/// <summary>
 	/// Sets the maximum number of threads the loader is allowed to use for loading images. A value of 0 specifies that 
 	/// the class implementation will make it's own choices about thread limitations.
@@ -96,9 +107,9 @@ struct IImageLoader
 	/// Attempts to get the image at the specified path. Returns false if the image could not be obtained.
 	/// </summary>
 	/// <param name="filePath">Path to the image.</param>
-	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
-	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const TryGetImageStatus TryGetImage(
+	/// <param name="imageLoadedCallback">Callback that will be invoked completion, returning an ImageLoadTaskResult.</param>
+	/// <returns>Status of the operation.</returns>
+	virtual TryGetImageStatus TryGetImage(
 		const std::filesystem::path& filePath, 
 		std::function<void(const ImageLoadTaskResult<TImage>)> imageLoadedCallback) = 0;
 
@@ -106,9 +117,11 @@ struct IImageLoader
 	/// Attempts to get the image at the specified path, and at the specified size. Returns false if the image could not be obtained.
 	/// </summary>
 	/// <param name="filePath">Path to the image.</param>
-	/// <param name="outImage">If the image was obtained this will be assigned to the instance, otherwise it will be set to nullptr.</param>
-	/// <returns>True if the image was successfully obtained.</returns>
-	virtual const TryGetImageStatus TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height,
+	/// <param name="width">The width in pixels of the image to be retrieved.</returns>
+	/// <param name="height">The height in pixels of the image to be retrieved.</returns>
+	/// <param name="imageLoadedCallback">Callback that will be invoked completion, returning an ImageLoadTaskResult.</param>
+	/// <returns>Status of the operation.</returns>
+	virtual TryGetImageStatus TryGetImage(const std::filesystem::path& filePath, unsigned int width, unsigned int height,
 		std::function<void(const ImageLoadTaskResult<TImage>)> imageLoadedCallback) = 0;
 
 	/// <summary>

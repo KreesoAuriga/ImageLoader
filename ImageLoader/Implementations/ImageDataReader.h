@@ -9,7 +9,7 @@
 /// <summary>
 /// Default implementation of the <see cref="IImageFileLoader"/> interface.
 /// </summary>
-class ImageDataReader : public IImageDataReader
+class ImageDataReader final : public IImageDataReader
 {
 public:
 	/// <summary>

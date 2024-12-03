@@ -57,6 +57,10 @@ namespace ImageCaching
 	template<typename TImage>
 	struct IImageCache
 	{
+	protected:
+		~IImageCache() = default;
+
+	public:
 		/// <summary>
 		/// Sets the maximum memory in bytes that the cache is allowed to use. 
 		/// </summary>
@@ -72,7 +76,8 @@ namespace ImageCaching
 		/// Attempts to get the image identified by the specified path.
 		/// </summary>
 		/// <param name="imagePath">Source path of the image.</param>
-		/// <param name="outImage">The image instance retrieved from the cache</param>
+		/// <param name="outImage">The image instance if type TImage retrieved from the cache or loaded from the path.</param>
+		/// <param name="outSourceImage">The source image instance retrieved from the cache or loaded from the path.</param>
 		/// <returns>Result of the operation</returns>
 		virtual TryGetImageResult TryGetImage(const std::filesystem::path& imagePath,
 			std::shared_ptr<const TImage>& outImage,
@@ -82,13 +87,20 @@ namespace ImageCaching
 		/// Attempts to get the image identified by the specified path, with the specified width and height in pixels.
 		/// </summary>
 		/// <param name="imagePath">Source path of the image.</param>
-		/// <param name="outImage">The image instance retrieved from the cache</param>
+		/// <param name="width">The width in pixels of the image to be retrieved.</returns>
+		/// <param name="height">The height in pixels of the image to be retrieved.</returns>
+		/// <param name="outImage">The image instance if type TImage retrieved from the cache or loaded from the path.</param>
+		/// <param name="outSourceImage">The source image instance retrieved from the cache or loaded from the path.</param>
 		/// <returns>Result of the operation</returns>
 		virtual TryGetImageResult TryGetImageAtSize(const std::filesystem::path& imagePath,
 			unsigned int width, unsigned int height,
 			std::shared_ptr<const TImage>& outImage,
 			const IImageSource*& outSourceImage) = 0;
 
+		/// <summary>
+		/// Constructs a shared pointer to the image instance, adding a custom deleter if required.
+		/// </summary>
+		/// <param name="image">The image.</param>
 		virtual std::shared_ptr<const TImage> MakeSharedPtr(const TImage* image) = 0;
 
 		/// <summary>
@@ -96,6 +108,8 @@ namespace ImageCaching
 		/// If there is already an image in the cache for the image's path, outImage will be the instance that that was in the cache.
 		/// </summary>
 		/// <param name="image">The image to add into the cache.</param>
+		/// <param name="outImage">If a different instance already exists in the cache at the image's path, this will be set to that instance.
+		/// Otherwise is nullptr.</param>
 		/// <returns>Result of the operation</returns>
 		virtual TryAddImageResult TryAddImage(std::shared_ptr<const TImage> image, const TImage*& outImage) = 0;
 
