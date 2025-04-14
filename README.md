@@ -1,5 +1,3 @@
-C++ example code (created as part of a programming test for a software developer position).
-
 Coding task done for a job interview, the prompt for the task is [task.md](https://github.com/KreesoAuriga/ImageLoader/blob/master/task.md) in the root folder of the repo.
 
 Created in Visual Studio 2022 as a CMake 'project' to allow it to be cross platform.  In Visual Studio 2022, load the 'ImageLoader' folder from the root of the repository. 
